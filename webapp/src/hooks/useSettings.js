@@ -7,10 +7,8 @@ export const DEFAULTS = {
   ageRange: [1, 15], // everything
   customChannels: [], // parent-added, same flat shape as channels.json entries: [{channel_id, channel_title, thumbnail, min_age, max_age}]
   overrides: {}, // per curated channel_id: {min_age?, max_age?, hidden?} edited in the table
-  parentLockUntil: 0, // ms epoch; parents button hidden until then after a failed gate
+  passkeyId: null, // WebAuthn credential id (base64url); when set, the parent gate is biometric-only
 }
-
-const PARENT_LOCK_MS = 60_000
 
 function load() {
   try {
@@ -20,6 +18,7 @@ function load() {
     for (const id of parsed.hiddenChannels ?? []) overrides[id] = { ...overrides[id], hidden: true }
     delete parsed.hiddenChannels
     delete parsed.ageOverrides
+    delete parsed.parentLockUntil // lockout mechanism removed
     return { ...DEFAULTS, ...parsed, overrides }
   } catch {
     return { ...DEFAULTS }
@@ -65,6 +64,6 @@ export default function useSettings() {
             .filter(([, rest]) => Object.keys(rest).length > 0),
         ),
       }),
-    lockParents: () => update({ parentLockUntil: Date.now() + PARENT_LOCK_MS }),
+    setPasskey: id => update({ passkeyId: id }),
   }
 }

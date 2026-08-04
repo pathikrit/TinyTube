@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import useVideos from './hooks/useVideos.js'
 import useWatchStore from './hooks/useWatchStore.js'
 import useSettings from './hooks/useSettings.js'
+import { verify, isBiometricAvailable } from './lib/webauthn.js'
 import Gallery from './components/Gallery.jsx'
 import PlayerView from './components/PlayerView.jsx'
 import MathGate from './components/MathGate.jsx'
 import ParentMode from './components/ParentMode.jsx'
+import EnrollGate from './components/EnrollGate.jsx'
 
 export default function App() {
   const store = useSettings()
@@ -13,6 +15,11 @@ export default function App() {
   const watchStore = useWatchStore()
   const [current, setCurrent] = useState(null) // video being played, or null
   const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'parent'
+  const [biometric, setBiometric] = useState(null) // null = still checking
+
+  useEffect(() => {
+    isBiometricAvailable().then(setBiometric)
+  }, [])
 
   // player/gate/parent are history entries so the browser back button
   // (and iOS edge-swipe) lands back on the gallery instead of leaving the app
@@ -42,12 +49,17 @@ export default function App() {
     )
   }
 
-  if (!channels) {
+  if (!channels || biometric === null) {
     return (
       <div className="d-flex vh-100 align-items-center justify-content-center">
         <div className="spinner-border text-danger" role="status" />
       </div>
     )
+  }
+
+  // first run on a biometric-capable device: enroll before anything else
+  if (biometric && !store.settings.passkeyId) {
+    return <EnrollGate onEnrolled={store.setPasskey} />
   }
 
   if (current) {
@@ -58,10 +70,7 @@ export default function App() {
     return (
       <MathGate
         onPass={() => setView('parent')} // same history depth: back from parent -> gallery
-        onFail={() => {
-          store.lockParents()
-          close()
-        }}
+        onFail={close}
       />
     )
   }
@@ -70,13 +79,22 @@ export default function App() {
     return <ParentMode db={db} store={store} onDone={close} />
   }
 
+  // enrolled device -> OS biometric prompt (called inside the tap handler to
+  // keep iOS user activation); otherwise the math gate bootstraps enrollment
+  const onParents = async () => {
+    if (store.settings.passkeyId) {
+      if (await verify(store.settings.passkeyId)) open(() => setView('parent'))()
+    } else {
+      open(() => setView('gate'))()
+    }
+  }
+
   return (
     <Gallery
       channels={channels}
       watchStore={watchStore}
-      parentLockUntil={store.settings.parentLockUntil}
       onPlay={open(setCurrent)}
-      onParents={open(() => setView('gate'))}
+      onParents={onParents}
     />
   )
 }
