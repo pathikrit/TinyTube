@@ -5,7 +5,8 @@ import ControlsBar from './ControlsBar.jsx'
 import PausedOverlay from './PausedOverlay.jsx'
 
 const OPTS = {
-  host: 'https://www.youtube-nocookie.com',
+  // NOT youtube-nocookie.com: its privacy mode misfires as "error 150,
+  // embedding disallowed" on mobile Safari for videos that embed fine
   width: '100%',
   height: '100%',
   playerVars: {
