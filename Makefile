@@ -12,7 +12,9 @@ dev: $(VIDEOS) ## local dev server (http://localhost:5173?age=5)
 	cd webapp && npm install && npm run dev -- --host
 
 test: ## test suite; also called in CI
-	@echo "no tests yet"
+	cd webapp && npm install && npm run test
 
-prod: download test ## used by gh-actions: package site for pathikrit.github.io/TinyTube
-	cd webapp && npm ci && npm run build
+prod: download ## used by gh-actions: package site for pathikrit.github.io/TinyTube
+	cd webapp && npm ci
+	$(MAKE) test
+	cd webapp && npm run build

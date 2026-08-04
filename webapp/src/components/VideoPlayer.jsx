@@ -17,21 +17,26 @@ const OPTS = {
     iv_load_policy: 3,
     autoplay: 1,
     modestbranding: 1,
+    origin: window.location.origin, // reliable postMessage event delivery
   },
 }
 
-const { PLAYING, ENDED } = { PLAYING: 1, ENDED: 0 }
+const { ENDED, PLAYING, BUFFERING } = { ENDED: 0, PLAYING: 1, BUFFERING: 3 }
 const RESUME_MIN = 10 // don't bother resuming the first seconds
 const RESUME_TAIL = 20 // ...or into the credits
 
 export default function VideoPlayer({ video, watchStore, onExit }) {
   const playerRef = useRef(null)
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState(null)
   const [playerState, setPlayerState] = useState(-1)
   const [progress, setProgress] = useState({ pos: 0, dur: video.duration ?? 0 })
   const [showControls, setShowControls] = useState(true)
   const hideTimer = useRef(null)
 
   const playing = playerState === PLAYING
+  // don't flash the opaque overlay while buffering into playback
+  const active = playing || playerState === BUFFERING
 
   const save = useCallback(() => {
     const p = playerRef.current
@@ -69,6 +74,7 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
 
   const onReady = e => {
     playerRef.current = e.target
+    setReady(true)
     const entry = watchStore.watched[video.id]
     if (entry && !entry.completed && entry.pos > RESUME_MIN && entry.pos < entry.dur - RESUME_TAIL) {
       e.target.seekTo(entry.pos, true)
@@ -82,9 +88,14 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
     if (e.data === ENDED) {
       watchStore.markCompleted(video.id)
       onExit()
-    } else if (e.data !== PLAYING) {
+    } else if (e.data !== PLAYING && e.data !== BUFFERING) {
       save()
     }
+  }
+
+  const onError = e => {
+    console.error(`YouTube player error ${e.data} for video ${video.id}`)
+    setError(e.data)
   }
 
   const seekBy = delta => {
@@ -97,7 +108,12 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
   const togglePlay = () => {
     const p = playerRef.current
     if (!p) return
-    playing ? p.pauseVideo() : p.playVideo()
+    if (playing) {
+      p.pauseVideo()
+    } else {
+      setPlayerState(BUFFERING) // dismiss the overlay immediately; ENDED/PAUSED events correct us if wrong
+      p.playVideo()
+    }
     pokeControls()
   }
 
@@ -110,13 +126,15 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
         iframeClassName="yt-iframe"
         onReady={onReady}
         onStateChange={onStateChange}
-        onError={onExit}
+        onError={onError}
       />
       <TouchShield onTap={() => (showControls ? setShowControls(false) : pokeControls())} />
-      {!playing && (
+      {error !== null && <ErrorOverlay video={video} code={error} onExit={onExit} />}
+      {error === null && !ready && <LoadingOverlay video={video} onExit={onExit} />}
+      {error === null && ready && !active && (
         <PausedOverlay video={video} onPlay={togglePlay} onExit={onExit} />
       )}
-      {(showControls || !playing) && (
+      {(showControls || (ready && !active)) && (
         <ControlsBar
           playing={playing}
           progress={progress}
@@ -125,6 +143,37 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
           onExit={onExit}
         />
       )}
+    </div>
+  )
+}
+
+function LoadingOverlay({ video, onExit }) {
+  return (
+    <div className="paused-overlay" style={{ backgroundImage: `url(${video.thumbnail})` }}>
+      <div className="paused-overlay-scrim d-flex flex-column align-items-center justify-content-center gap-3 p-4">
+        <div className="spinner-border text-danger" role="status" />
+        <div className="fs-5 text-center text-truncate w-100">{video.title}</div>
+        <button type="button" className="btn btn-outline-light btn-lg" onClick={onExit}>
+          <i className="fa-solid fa-grid-2 me-2" />
+          More videos
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// 101/150 = embedding disabled by the channel; 2/5/100 = bad/unplayable video
+function ErrorOverlay({ video, code, onExit }) {
+  return (
+    <div className="paused-overlay" style={{ backgroundImage: `url(${video.thumbnail})` }}>
+      <div className="paused-overlay-scrim d-flex flex-column align-items-center justify-content-center gap-3 p-4">
+        <i className="fa-solid fa-face-frown fa-3x" />
+        <div className="fs-5 text-center">This video can't play here (error {code})</div>
+        <button type="button" className="btn btn-danger btn-lg" onClick={onExit}>
+          <i className="fa-solid fa-grid-2 me-2" />
+          Pick another video
+        </button>
+      </div>
     </div>
   )
 }

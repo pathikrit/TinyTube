@@ -18,7 +18,7 @@ channels.json ─▶ scraper (yt-dlp, GH Actions cron) ─▶ webapp/public/vide
 
 - `make download` — scrape channels → `webapp/public/videos.json`
 - `make dev` — download (if missing) + vite dev server (`http://localhost:5173?age=5`; the `/TinyTube/` base path applies only to production builds)
-- `make test` — test suite (placeholder for now); called by `make prod`
+- `make test` — vitest suite (`webapp/src/**/*.test.js*`: gallery sort logic + VideoPlayer lifecycle with a mocked react-youtube); called by `make prod`
 - `make prod` — download + test + `vite build`; what CI runs
 
 ## Key behaviors (do not regress)
