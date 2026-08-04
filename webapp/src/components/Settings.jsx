@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
-import { curatedChannels } from '../lib/channels.js'
+import { curatedChannels, overlaps } from '../lib/channels.js'
 import { searchChannels, resolveChannel, evictChannelCache, formatSubscribers } from '../lib/youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
 const channelUrl = ch => ch.source_url ?? `https://www.youtube.com/channel/${ch.channel_id}`
 
-export default function ParentMode({ db, store, onDone }) {
+export default function Settings({ db, store, onDone }) {
   return (
-    <div className="parent-mode container py-4" style={{ maxWidth: 720 }}>
+    <div className="settings container-xl py-4">
       <div className="d-flex align-items-center mb-4">
         <h1 className="fs-3 fw-bold m-0 me-auto">
           <i className="fa-sharp-duotone fa-regular fa-family me-2 text-danger" />
-          Parent mode
+          Settings
         </h1>
         <button type="button" className="btn btn-danger btn-lg" onClick={onDone}>
           <i className="fa-sharp-duotone fa-regular fa-check me-2" />
@@ -25,38 +25,63 @@ export default function ParentMode({ db, store, onDone }) {
       <ApiKeyRow apiKey={store.settings.apiKey} onChange={store.setApiKey} />
       <SearchRow apiKey={store.settings.apiKey} store={store} />
       <ChannelTable db={db} store={store} />
+      <VersionFooter />
     </div>
   )
 }
 
-function AgeRow({ value: [lo, hi], onChange }) {
+function VersionFooter() {
+  const sha = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : ''
+  if (!sha) return null
+  return (
+    <div className="text-center mt-4">
+      <a
+        href={`https://github.com/pathikrit/TinyTube/commit/${sha}`}
+        target="_blank"
+        rel="noreferrer"
+        className="text-secondary small text-decoration-none"
+      >
+        <i className="fa-sharp-duotone fa-regular fa-code-commit me-1" />
+        v{sha.slice(0, 7)}
+      </a>
+    </div>
+  )
+}
+
+function DualAgeSlider({ value: [lo, hi], onChange }) {
   const pos = v => `calc(${(v - 1) / 14} * (100% - 32px) + 16px)`
+  return (
+    <div className="dual-slider flex-grow-1">
+      <input
+        type="range"
+        min="1"
+        max="15"
+        value={lo}
+        aria-label="Youngest age"
+        onChange={e => onChange([Math.min(+e.target.value, hi), hi])}
+      />
+      <input
+        type="range"
+        min="1"
+        max="15"
+        value={hi}
+        aria-label="Oldest age"
+        onChange={e => onChange([lo, Math.max(+e.target.value, lo)])}
+      />
+      <span className="thumb-label" style={{ left: pos(lo) }}>{lo}</span>
+      <span className="thumb-label" style={{ left: pos(hi) }}>{hi}</span>
+    </div>
+  )
+}
+
+function AgeRow({ value, onChange }) {
   return (
     <div className="d-flex align-items-center gap-3 mb-3">
       <span className="text-secondary text-nowrap">
         <i className="fa-sharp-duotone fa-regular fa-children me-2" />
         Age:
       </span>
-      <div className="dual-slider flex-grow-1">
-        <input
-          type="range"
-          min="1"
-          max="15"
-          value={lo}
-          aria-label="Youngest age"
-          onChange={e => onChange([Math.min(+e.target.value, hi), hi])}
-        />
-        <input
-          type="range"
-          min="1"
-          max="15"
-          value={hi}
-          aria-label="Oldest age"
-          onChange={e => onChange([lo, Math.max(+e.target.value, lo)])}
-        />
-        <span className="thumb-label" style={{ left: pos(lo) }}>{lo}</span>
-        <span className="thumb-label" style={{ left: pos(hi) }}>{hi}</span>
-      </div>
+      <DualAgeSlider value={value} onChange={onChange} />
     </div>
   )
 }
@@ -66,7 +91,7 @@ function ApiKeyRow({ apiKey, onChange }) {
     <div className="d-flex align-items-center gap-3 mb-3">
       <span className="text-secondary text-nowrap">
         <i className="fa-sharp-duotone fa-regular fa-key me-2" />
-        <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>:
+        <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>
       </span>
       <input
         type="password"
@@ -124,7 +149,7 @@ function SearchRow({ apiKey, store }) {
       <div className="d-flex align-items-center gap-3">
         <span className="text-secondary text-nowrap">
           <i className="fa-sharp-duotone fa-regular fa-magnifying-glass me-2" />
-          Add:
+          Add Channel
         </span>
         <div className="position-relative flex-grow-1">
           <input
@@ -166,19 +191,14 @@ function SearchRow({ apiKey, store }) {
   )
 }
 
-function AgeCell({ row, field, store }) {
-  const ch = row.original
+function ChannelAgeSlider({ ch, store }) {
   const save = ch.custom
     ? patch => store.updateCustomChannel(ch.channel_id, patch)
     : patch => store.setOverride(ch.channel_id, patch)
   return (
-    <input
-      type="number"
-      min="1"
-      max="15"
-      className="form-control form-control-sm age-input"
-      value={ch[field]}
-      onChange={e => save({ [field]: +e.target.value })}
+    <DualAgeSlider
+      value={[ch.min_age, ch.max_age]}
+      onChange={([min_age, max_age]) => save({ min_age, max_age })}
     />
   )
 }
@@ -188,17 +208,21 @@ function ChannelTable({ db, store }) {
   const hiddenCount = Object.values(overrides).filter(o => o.hidden).length
 
   const data = useMemo(
-    () => [
-      ...customChannels.map(ch => ({ ...ch, custom: true })),
-      ...curatedChannels(db, overrides).filter(ch => !ch.hidden),
-    ],
+    () =>
+      [
+        ...customChannels.map(ch => ({ ...ch, custom: true })),
+        ...curatedChannels(db, overrides).filter(ch => !ch.hidden),
+      ].sort((a, b) => b.min_age - a.min_age || b.max_age - a.max_age),
     [db, customChannels, overrides],
   )
+
+  const { ageRange } = store.settings
+  const inRange = data.filter(ch => overlaps(ageRange, ch.min_age, ch.max_age)).length
 
   const columns = useMemo(
     () => [
       {
-        header: 'Channel',
+        header: `Channel (${inRange}/${data.length})`,
         accessorKey: 'channel_title',
         cell: ({ row }) => {
           const ch = row.original
@@ -216,8 +240,11 @@ function ChannelTable({ db, store }) {
           )
         },
       },
-      { header: 'Min age', id: 'min_age', cell: props => <AgeCell {...props} field="min_age" store={store} /> },
-      { header: 'Max age', id: 'max_age', cell: props => <AgeCell {...props} field="max_age" store={store} /> },
+      {
+        header: 'Ages',
+        id: 'ages',
+        cell: ({ row }) => <ChannelAgeSlider ch={row.original} store={store} />,
+      },
       {
         id: 'delete',
         header: '',
@@ -241,35 +268,51 @@ function ChannelTable({ db, store }) {
         ),
       },
     ],
-    [store],
+    [store, data, inRange],
   )
 
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() })
 
   return (
     <>
-      <table className="table table-dark table-hover align-middle">
-        <thead>
-          {table.getHeaderGroups().map(hg => (
-            <tr key={hg.id}>
-              {hg.headers.map(h => (
-                <th key={h.id} className="text-secondary fw-normal">
-                  {flexRender(h.column.columnDef.header, h.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map(row => (
-            <tr key={row.id}>
-              {row.getVisibleCells().map(cell => (
-                <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* the ages column reserves real width so the 1-15 dual slider stays as
+          readable as the global one up top; narrow screens scroll horizontally
+          via table-responsive instead of crushing the track */}
+      <div className="table-responsive">
+        <table className="table table-dark align-middle">
+          <thead>
+            {table.getHeaderGroups().map(hg => (
+              <tr key={hg.id}>
+                {hg.headers.map(h => (
+                  <th
+                    key={h.id}
+                    className="text-secondary fw-normal"
+                    style={h.column.id === 'ages' ? { width: '55%', minWidth: 420 } : undefined}
+                  >
+                    {flexRender(h.column.columnDef.header, h.getContext())}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map(row => (
+              <tr
+                key={row.id}
+                className={
+                  overlaps(store.settings.ageRange, row.original.min_age, row.original.max_age)
+                    ? undefined
+                    : 'out-of-range' // hidden from the kid by the current age filter
+                }
+              >
+                {row.getVisibleCells().map(cell => (
+                  <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {hiddenCount > 0 && (
         <button
           type="button"

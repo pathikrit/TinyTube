@@ -6,7 +6,7 @@ import { verify, isBiometricAvailable } from './lib/webauthn.js'
 import Gallery from './components/Gallery.jsx'
 import PlayerView from './components/PlayerView.jsx'
 import MathGate from './components/MathGate.jsx'
-import ParentMode from './components/ParentMode.jsx'
+import Settings from './components/Settings.jsx'
 import EnrollGate from './components/EnrollGate.jsx'
 
 export default function App() {
@@ -14,14 +14,14 @@ export default function App() {
   const { db, channels, error } = useVideos(store.settings)
   const watchStore = useWatchStore()
   const [current, setCurrent] = useState(null) // video being played, or null
-  const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'parent'
+  const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'settings'
   const [biometric, setBiometric] = useState(null) // null = still checking
 
   useEffect(() => {
     isBiometricAvailable().then(setBiometric)
   }, [])
 
-  // player/gate/parent are history entries so the browser back button
+  // player/gate/settings are history entries so the browser back button
   // (and iOS edge-swipe) lands back on the gallery instead of leaving the app
   useEffect(() => {
     const onPop = () => {
@@ -69,21 +69,21 @@ export default function App() {
   if (view === 'gate') {
     return (
       <MathGate
-        onPass={() => setView('parent')} // same history depth: back from parent -> gallery
+        onPass={() => setView('settings')} // same history depth: back from settings -> gallery
         onFail={close}
       />
     )
   }
 
-  if (view === 'parent') {
-    return <ParentMode db={db} store={store} onDone={close} />
+  if (view === 'settings') {
+    return <Settings db={db} store={store} onDone={close} />
   }
 
   // enrolled device -> OS biometric prompt (called inside the tap handler to
   // keep iOS user activation); otherwise the math gate bootstraps enrollment
   const onParents = async () => {
     if (store.settings.passkeyId) {
-      if (await verify(store.settings.passkeyId)) open(() => setView('parent'))()
+      if (await verify(store.settings.passkeyId)) open(() => setView('settings'))()
     } else {
       open(() => setView('gate'))()
     }

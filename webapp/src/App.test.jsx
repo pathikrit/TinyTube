@@ -69,11 +69,11 @@ describe('parent gate', () => {
     expect(verify).not.toHaveBeenCalled()
   })
 
-  it('goes straight to the biometric and into parent mode when enrolled', async () => {
+  it('goes straight to the biometric and into settings when enrolled', async () => {
     localStorage.setItem('tinytube:settings:v1', JSON.stringify({ passkeyId: 'abc' }))
     render(<App />)
     fireEvent.click(await screen.findByLabelText('Parents'))
-    expect(await screen.findByText(/Parent mode/)).toBeTruthy()
+    expect(await screen.findByText(/Settings/)).toBeTruthy()
     expect(verify).toHaveBeenCalledWith('abc')
     expect(screen.queryByText(/Grown-ups only/)).toBeNull()
   })
@@ -84,7 +84,7 @@ describe('parent gate', () => {
     render(<App />)
     fireEvent.click(await screen.findByLabelText('Parents'))
     expect(verify).toHaveBeenCalled()
-    expect(screen.queryByText(/Parent mode/)).toBeNull()
+    expect(screen.queryByText(/Settings/)).toBeNull()
     expect(screen.queryByText(/Grown-ups only/)).toBeNull()
   })
 })

@@ -68,7 +68,7 @@ html, body, #root {
   color: #fff;
 }
 
-.parent-mode {
+.settings {
   min-height: 100%;
   padding-top: calc(1.5rem + env(safe-area-inset-top));
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
@@ -77,11 +77,6 @@ html, body, #root {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;
-}
-
-.age-input {
-  width: 4.5rem;
-  padding: 0.25rem 0.5rem;
 }
 
 /* dual-handle range: two stacked native sliders, only the thumbs take touches */
@@ -145,6 +140,16 @@ html, body, #root {
   font-weight: 700;
   font-size: 0.85rem;
   line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); /* extra contrast on the red thumb */
+}
+
+/* channel rows outside the global age filter: still editable, visibly inactive */
+tr.out-of-range {
+  opacity: 0.35;
+}
+
+tr.out-of-range img {
+  filter: grayscale(1);
 }
 
 /* ---------- player ---------- */
