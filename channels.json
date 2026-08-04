@@ -1,12 +1,12 @@
 [
-  { "channel": "msrachel", "min_age": 2, "max_age": 4 },
-  { "channel": "Blippi", "min_age": 2, "max_age": 4 },
-  { "channel": "Numberblocks", "min_age": 3, "max_age": 7 },
-  { "channel": "OfficialAlphablocks", "min_age": 3, "max_age": 7 },
-  { "channel": "TheDadLab", "min_age": 3, "max_age": 7 },
-  { "channel": "SciShowKids", "min_age": 5, "max_age": 10 },
-  { "channel": "maddiemoate", "min_age": 5, "max_age": 10 },
-  { "channel": "freeschool", "min_age": 5, "max_age": 10 },
-  { "channel": "MysterySci", "min_age": 5, "max_age": 10 },
-  { "channel": "JaredOwen", "min_age": 8, "max_age": 12 }
+  { "channel": "msrachel", "min_age": 2, "max_age": 3 },
+  { "channel": "Blippi", "min_age": 2, "max_age": 3 },
+  { "channel": "Numberblocks", "min_age": 3, "max_age": 4 },
+  { "channel": "OfficialAlphablocks", "min_age": 3, "max_age": 4 },
+  { "channel": "SciShowKids", "min_age": 4, "max_age": 5 },
+  { "channel": "MysterySci", "min_age": 4, "max_age": 5 },
+  { "channel": "PeekabooKidz", "min_age": 4, "max_age": 5 },
+  { "channel": "JackHartmann", "min_age": 4, "max_age": 5 },
+  { "channel": "NumberjacksTV", "min_age": 5, "max_age": 6 },
+  { "channel": "HomeschoolPop", "min_age": 5, "max_age": 6 }
 ]
