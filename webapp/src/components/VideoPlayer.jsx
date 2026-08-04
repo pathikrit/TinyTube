@@ -154,7 +154,7 @@ function LoadingOverlay({ video, onExit }) {
         <div className="spinner-border text-danger" role="status" />
         <div className="fs-5 text-center text-truncate w-100">{video.title}</div>
         <button type="button" className="btn btn-outline-light btn-lg" onClick={onExit}>
-          <i className="fa-solid fa-grid-2 me-2" />
+          <i className="fa-sharp-duotone fa-regular fa-grid-2 me-2" />
           More videos
         </button>
       </div>
@@ -167,10 +167,10 @@ function ErrorOverlay({ video, code, onExit }) {
   return (
     <div className="paused-overlay" style={{ backgroundImage: `url(${video.thumbnail})` }}>
       <div className="paused-overlay-scrim d-flex flex-column align-items-center justify-content-center gap-3 p-4">
-        <i className="fa-solid fa-face-frown fa-3x" />
+        <i className="fa-sharp-duotone fa-regular fa-face-frown fa-3x" />
         <div className="fs-5 text-center">This video can't play here (error {code})</div>
         <button type="button" className="btn btn-danger btn-lg" onClick={onExit}>
-          <i className="fa-solid fa-grid-2 me-2" />
+          <i className="fa-sharp-duotone fa-regular fa-grid-2 me-2" />
           Pick another video
         </button>
       </div>

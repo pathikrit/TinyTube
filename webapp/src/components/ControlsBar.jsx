@@ -13,18 +13,18 @@ export default function ControlsBar({ playing, progress, onTogglePlay, onSeek, o
       </div>
       <div className="d-flex align-items-center gap-3">
         <button type="button" className="btn btn-ctl" onClick={onExit} aria-label="Back">
-          <i className="fa-solid fa-arrow-left" />
+          <i className="fa-sharp-duotone fa-regular fa-arrow-left" />
         </button>
         <span className="text-white-50 small">{fmt(progress.pos)} / {fmt(progress.dur)}</span>
         <div className="ms-auto d-flex gap-3">
           <button type="button" className="btn btn-ctl" onClick={() => onSeek(-10)} aria-label="Back 10 seconds">
-            <i className="fa-solid fa-rotate-left" />
+            <i className="fa-sharp-duotone fa-regular fa-rotate-left" />
           </button>
           <button type="button" className="btn btn-ctl" onClick={onTogglePlay} aria-label="Play or pause">
-            <i className={`fa-solid ${playing ? 'fa-pause' : 'fa-play'}`} />
+            <i className={`fa-sharp-duotone fa-regular ${playing ? 'fa-pause' : 'fa-play'}`} />
           </button>
           <button type="button" className="btn btn-ctl" onClick={() => onSeek(10)} aria-label="Forward 10 seconds">
-            <i className="fa-solid fa-rotate-right" />
+            <i className="fa-sharp-duotone fa-regular fa-rotate-right" />
           </button>
         </div>
       </div>

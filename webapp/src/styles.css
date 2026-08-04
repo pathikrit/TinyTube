@@ -59,6 +59,78 @@ html, body, #root {
   text-shadow: 0 0 4px #000;
 }
 
+/* ---------- parent gate & parent mode ---------- */
+
+.math-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #000;
+  color: #fff;
+}
+
+.parent-mode {
+  min-height: 100%;
+  padding-top: calc(1.5rem + env(safe-area-inset-top));
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.age-input {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* dual-handle range: two stacked native sliders, only the thumbs take touches */
+.dual-slider {
+  position: relative;
+  height: 2.5rem;
+}
+
+.dual-slider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 6px;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dual-slider input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dual-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e62117;
+  border: 3px solid #fff;
+  cursor: pointer;
+}
+
+.dual-slider input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e62117;
+  border: 3px solid #fff;
+  cursor: pointer;
+}
+
 /* ---------- player ---------- */
 
 .player-view {

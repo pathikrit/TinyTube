@@ -24,7 +24,7 @@ export default function VideoCard({ video, entry, onPlay }) {
         )}
         {isWatched && (
           <span className="watched-badge position-absolute top-0 end-0 m-1">
-            <i className="fa-solid fa-circle-check" />
+            <i className="fa-sharp-duotone fa-regular fa-circle-check" />
           </span>
         )}
         {f > 0 && !isWatched && (
