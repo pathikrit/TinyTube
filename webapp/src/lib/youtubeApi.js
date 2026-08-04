@@ -25,10 +25,36 @@ function channelFromSnippet(id, snippet) {
   }
 }
 
-/** Free-text channel search. Costs 100 quota units — call on explicit button press only. */
+/**
+ * Free-text channel search with preview stats. search.list costs 100 quota
+ * units per call — callers must debounce (the 10k/day default quota affords
+ * ~100 fired searches). The follow-up channels.list (1 unit) upgrades results
+ * with real avatars and subscriber counts for previews.
+ */
 export async function searchChannels(apiKey, query) {
-  const body = await get('search', { part: 'snippet', type: 'channel', q: query, maxResults: 8, key: apiKey })
-  return (body.items ?? []).map(item => channelFromSnippet(item.id.channelId, item.snippet))
+  const body = await get('search', { part: 'snippet', type: 'channel', q: query, maxResults: 6, key: apiKey })
+  const results = (body.items ?? []).map(item => channelFromSnippet(item.id.channelId, item.snippet))
+  if (!results.length) return results
+  try {
+    const details = await get('channels', {
+      part: 'snippet,statistics',
+      id: results.map(r => r.channel_id).join(','),
+      key: apiKey,
+    })
+    const byId = Object.fromEntries((details.items ?? []).map(it => [it.id, it]))
+    return results.map(r => {
+      const d = byId[r.channel_id]
+      return d
+        ? { ...channelFromSnippet(d.id, d.snippet), subscribers: Number(d.statistics?.subscriberCount) || null }
+        : r
+    })
+  } catch {
+    return results // preview enrichment is best-effort
+  }
+}
+
+export function formatSubscribers(n) {
+  return n ? `${Intl.NumberFormat('en', { notation: 'compact' }).format(n)} subscribers` : ''
 }
 
 /** Resolve a pasted UC id, channel URL, or @handle (bare or in a URL) to a channel. 1 unit. */
@@ -53,7 +79,11 @@ export function parseDuration(iso) {
   return (Number(m[1]) || 0) * 3600 + (Number(m[2]) || 0) * 60 + (Number(m[3]) || 0)
 }
 
-/** Latest long-form uploads (UULF playlist excludes Shorts), shaped like the scraper's output. 2 units. */
+/**
+ * Latest long-form uploads (UULF playlist excludes Shorts), shaped like the
+ * scraper's output. 18+ age-restricted videos (ytRating) are dropped — they
+ * wouldn't play in an embed anyway and this is a kids app. 2 units.
+ */
 export async function fetchChannelVideos(apiKey, channelId) {
   const playlist = await get('playlistItems', {
     part: 'snippet,contentDetails',
@@ -66,19 +96,25 @@ export async function fetchChannelVideos(apiKey, channelId) {
 
   const ids = items.map(it => it.contentDetails.videoId)
   const durations = {}
+  const ageRestricted = new Set()
   try {
     const details = await get('videos', { part: 'contentDetails', id: ids.join(','), key: apiKey })
-    for (const v of details.items ?? []) durations[v.id] = parseDuration(v.contentDetails?.duration)
+    for (const v of details.items ?? []) {
+      durations[v.id] = parseDuration(v.contentDetails?.duration)
+      if (v.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') ageRestricted.add(v.id)
+    }
   } catch (e) {
     console.warn('duration lookup failed, continuing without', e)
   }
 
-  return items.map(it => ({
-    id: it.contentDetails.videoId,
-    title: it.snippet.title,
-    duration: durations[it.contentDetails.videoId] ?? null,
-    thumbnail: `https://i.ytimg.com/vi/${it.contentDetails.videoId}/mqdefault.jpg`,
-  }))
+  return items
+    .filter(it => !ageRestricted.has(it.contentDetails.videoId))
+    .map(it => ({
+      id: it.contentDetails.videoId,
+      title: it.snippet.title,
+      duration: durations[it.contentDetails.videoId] ?? null,
+      thumbnail: `https://i.ytimg.com/vi/${it.contentDetails.videoId}/mqdefault.jpg`,
+    }))
 }
 
 function readCache() {

@@ -72,6 +72,11 @@ html, body, #root {
   min-height: 100%;
   padding-top: calc(1.5rem + env(safe-area-inset-top));
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  /* the global kid-proof user-select:none must not apply here — parents
+     need to select/paste (API key, channel URLs) */
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .age-input {
@@ -130,6 +135,18 @@ html, body, #root {
   cursor: pointer;
 }
 
+/* age boundary values rendered on the slider thumbs themselves */
+.dual-slider .thumb-label {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 /* ---------- player ---------- */
 
 .player-view {
@@ -137,6 +154,34 @@ html, body, #root {
   inset: 0;
   background: #000;
   overscroll-behavior: none; /* no accidental pull-to-refresh mid-video */
+}
+
+/* force landscape on phones/tablets held in portrait: rotate the whole
+   player 90° (iOS has no orientation-lock API; Android locks for real and
+   then this media query simply no longer matches) */
+@media (orientation: portrait) and (pointer: coarse) {
+  .player-view {
+    right: auto;
+    bottom: auto;
+    width: 100dvh;
+    height: 100dvw;
+    transform: rotate(90deg) translateY(-100%);
+    transform-origin: top left;
+  }
+}
+
+.player-topbar {
+  height: 56px;
+  flex: none;
+  background: #111;
+  padding-top: env(safe-area-inset-top);
+  box-sizing: content-box;
+}
+
+.btn-ctl-sm {
+  width: 44px;
+  height: 44px;
+  font-size: 1.1rem;
 }
 
 .yt-frame, .yt-iframe {

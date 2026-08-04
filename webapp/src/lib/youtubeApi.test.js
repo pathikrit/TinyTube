@@ -74,12 +74,32 @@ describe('resolveChannel', () => {
 })
 
 describe('searchChannels', () => {
-  it('hits search with type=channel and maps results', async () => {
-    vi.stubGlobal('fetch', mockFetch({ search: params => {
-      expect(params.get('type')).toBe('channel')
-      expect(params.get('q')).toBe('blippi')
-      return { items: [{ id: { channelId: UC }, snippet: { title: 'Blippi', thumbnails: {} } }] }
-    } }))
+  it('searches type=channel and enriches with subscriber counts for preview', async () => {
+    vi.stubGlobal('fetch', mockFetch({
+      search: params => {
+        expect(params.get('type')).toBe('channel')
+        expect(params.get('q')).toBe('blippi')
+        return { items: [{ id: { channelId: UC }, snippet: { title: 'Blippi', thumbnails: {} } }] }
+      },
+      channels: {
+        items: [{
+          id: UC,
+          snippet: { title: 'Blippi', thumbnails: { medium: { url: 'avatar.jpg' } } },
+          statistics: { subscriberCount: '1000000' },
+        }],
+      },
+    }))
+    const results = await searchChannels('KEY', 'blippi')
+    expect(results).toEqual([
+      { channel_id: UC, channel_title: 'Blippi', thumbnail: 'avatar.jpg', subscribers: 1000000 },
+    ])
+  })
+
+  it('falls back to bare search snippets if the preview lookup fails', async () => {
+    vi.stubGlobal('fetch', mockFetch({
+      search: { items: [{ id: { channelId: UC }, snippet: { title: 'Blippi', thumbnails: {} } }] },
+      // no `channels` route -> 404 -> enrichment swallowed
+    }))
     const results = await searchChannels('KEY', 'blippi')
     expect(results).toEqual([{ channel_id: UC, channel_title: 'Blippi', thumbnail: undefined }])
   })
@@ -98,6 +118,21 @@ describe('fetchChannelVideos', () => {
     expect(videos).toEqual([
       { id: 'vid1', title: 'T1', duration: 120, thumbnail: 'https://i.ytimg.com/vi/vid1/mqdefault.jpg' },
     ])
+  })
+
+  it('drops 18+ age-restricted videos', async () => {
+    vi.stubGlobal('fetch', mockFetch({
+      playlistItems: { items: [
+        { contentDetails: { videoId: 'ok1' }, snippet: { title: 'Fine' } },
+        { contentDetails: { videoId: 'adult1' }, snippet: { title: 'Nope' } },
+      ] },
+      videos: { items: [
+        { id: 'ok1', contentDetails: { duration: 'PT1M' } },
+        { id: 'adult1', contentDetails: { duration: 'PT1M', contentRating: { ytRating: 'ytAgeRestricted' } } },
+      ] },
+    }))
+    const videos = await fetchChannelVideos('KEY', UC)
+    expect(videos.map(v => v.id)).toEqual(['ok1'])
   })
 
   it('propagates API errors', async () => {

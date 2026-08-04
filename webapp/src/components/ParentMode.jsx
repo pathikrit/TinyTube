@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
 import { curatedChannels } from '../lib/channels.js'
-import { searchChannels, resolveChannel, evictChannelCache } from '../lib/youtubeApi.js'
+import { searchChannels, resolveChannel, evictChannelCache, formatSubscribers } from '../lib/youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
+const channelUrl = ch => ch.source_url ?? `https://www.youtube.com/channel/${ch.channel_id}`
 
 export default function ParentMode({ db, store, onDone }) {
-  const { settings } = store
-  const curated = curatedChannels(db)
-
   return (
     <div className="parent-mode container py-4" style={{ maxWidth: 720 }}>
       <div className="d-flex align-items-center mb-4">
@@ -22,23 +21,23 @@ export default function ParentMode({ db, store, onDone }) {
         </button>
       </div>
 
-      <AgeRangeSection value={settings.ageRange} onChange={store.setAgeRange} />
-      <ApiKeySection apiKey={settings.apiKey} onChange={store.setApiKey} />
-      <AddChannelSection apiKey={settings.apiKey} store={store} />
-      <ChannelListSection curated={curated} store={store} />
+      <AgeRow value={store.settings.ageRange} onChange={store.setAgeRange} />
+      <ApiKeyRow apiKey={store.settings.apiKey} onChange={store.setApiKey} />
+      <SearchRow apiKey={store.settings.apiKey} store={store} />
+      <ChannelTable db={db} store={store} />
     </div>
   )
 }
 
-function AgeRangeSection({ value: [lo, hi], onChange }) {
+function AgeRow({ value: [lo, hi], onChange }) {
+  const pos = v => `calc(${(v - 1) / 14} * (100% - 32px) + 16px)`
   return (
-    <section className="mb-4">
-      <h2 className="fs-5 text-secondary">
+    <div className="d-flex align-items-center gap-3 mb-3">
+      <span className="text-secondary text-nowrap">
         <i className="fa-sharp-duotone fa-regular fa-children me-2" />
-        Ages {lo}–{hi}
-        {lo === 1 && hi === 15 && ' (everything)'}
-      </h2>
-      <div className="dual-slider">
+        Age:
+      </span>
+      <div className="dual-slider flex-grow-1">
         <input
           type="range"
           min="1"
@@ -55,203 +54,231 @@ function AgeRangeSection({ value: [lo, hi], onChange }) {
           aria-label="Oldest age"
           onChange={e => onChange([lo, Math.max(+e.target.value, lo)])}
         />
+        <span className="thumb-label" style={{ left: pos(lo) }}>{lo}</span>
+        <span className="thumb-label" style={{ left: pos(hi) }}>{hi}</span>
       </div>
-      <div className="form-text">Only channels for this age range show up in the gallery.</div>
-    </section>
+    </div>
   )
 }
 
-function ApiKeySection({ apiKey, onChange }) {
+function ApiKeyRow({ apiKey, onChange }) {
   return (
-    <section className="mb-4">
-      <h2 className="fs-5 text-secondary">
+    <div className="d-flex align-items-center gap-3 mb-3">
+      <span className="text-secondary text-nowrap">
         <i className="fa-sharp-duotone fa-regular fa-key me-2" />
-        YouTube API key
-      </h2>
+        <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>:
+      </span>
       <input
         type="password"
-        className="form-control form-control-lg"
-        placeholder="AIza…"
+        className="form-control"
+        placeholder="AIza… (needed to add channels)"
         defaultValue={apiKey}
         onBlur={e => onChange(e.target.value)}
         autoComplete="off"
       />
-      <div className="form-text">
-        Needed only to search for and add your own channels — the built-in ones work without it.{' '}
-        <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">
-          Get a free key
-        </a>{' '}
-        (enable "YouTube Data API v3", then Credentials → Create API key; restrict it to this site's
-        address). The key stays on this device.
-      </div>
-    </section>
+    </div>
   )
 }
 
-function AddChannelSection({ apiKey, store }) {
+function SearchRow({ apiKey, store }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
-  const search = async e => {
-    e.preventDefault()
-    if (!query.trim() || busy) return
-    setBusy(true)
-    setError(null)
-    try {
-      setResults(
-        looksLikeLink(query) ? [await resolveChannel(apiKey, query)] : await searchChannels(apiKey, query),
-      )
-    } catch (err) {
-      setError(err.message)
+  // inline autocomplete: debounced 500ms, min 3 chars (search.list = 100
+  // quota units per fired query, so don't search every keystroke)
+  useEffect(() => {
+    const q = query.trim()
+    if (!apiKey || q.length < 3) {
       setResults([])
-    } finally {
-      setBusy(false)
+      setError(null)
+      return
     }
-  }
+    let stale = false
+    const timer = setTimeout(async () => {
+      setBusy(true)
+      try {
+        const found = looksLikeLink(q) ? [await resolveChannel(apiKey, q)] : await searchChannels(apiKey, q)
+        if (!stale) {
+          setResults(found)
+          setError(null)
+        }
+      } catch (err) {
+        if (!stale) {
+          setResults([])
+          setError(err.message)
+        }
+      } finally {
+        if (!stale) setBusy(false)
+      }
+    }, 500)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [query, apiKey])
 
   return (
-    <section className="mb-4">
-      <h2 className="fs-5 text-secondary">
-        <i className="fa-sharp-duotone fa-regular fa-magnifying-glass me-2" />
-        Add a channel
-      </h2>
-      {apiKey ? (
-        <form className="d-flex gap-2" onSubmit={search}>
+    <div className="mb-3">
+      <div className="d-flex align-items-center gap-3">
+        <span className="text-secondary text-nowrap">
+          <i className="fa-sharp-duotone fa-regular fa-magnifying-glass me-2" />
+          Add:
+        </span>
+        <div className="position-relative flex-grow-1">
           <input
             type="text"
-            className="form-control form-control-lg"
-            placeholder="Channel name, @handle, or URL"
+            className="form-control"
+            placeholder={apiKey ? 'Channel name, @handle, or URL' : 'Enter an API key above first'}
+            disabled={!apiKey}
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
-          <button type="submit" className="btn btn-outline-light btn-lg" disabled={busy}>
-            {busy ? (
-              <span className="spinner-border spinner-border-sm" role="status" />
-            ) : (
-              <i className="fa-sharp-duotone fa-regular fa-magnifying-glass" />
-            )}
-          </button>
-        </form>
-      ) : (
-        <div className="form-text">Add your API key above to search for channels.</div>
-      )}
+          {busy && (
+            <span
+              className="spinner-border spinner-border-sm position-absolute top-50 end-0 translate-middle-y me-2"
+              role="status"
+            />
+          )}
+        </div>
+      </div>
       {error && <div className="alert alert-warning mt-2 py-2">{error}</div>}
       {results.map(ch => (
-        <SearchResult
-          key={ch.channel_id}
-          channel={ch}
-          onAdd={added => {
-            store.addCustomChannel(added)
-            setResults(rs => rs.filter(r => r.channel_id !== added.channel_id))
-          }}
-        />
+        <div key={ch.channel_id} className="d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2">
+          <img src={ch.thumbnail} alt="" width="36" height="36" className="rounded-circle" />
+          <span className="fw-semibold text-truncate">{ch.channel_title}</span>
+          <span className="me-auto text-secondary small text-nowrap">{formatSubscribers(ch.subscribers)}</span>
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={() => {
+              store.addCustomChannel({ ...ch, min_age: 1, max_age: 15 })
+              setQuery('')
+            }}
+          >
+            <i className="fa-sharp-duotone fa-regular fa-plus me-1" />
+            Add
+          </button>
+        </div>
       ))}
-    </section>
-  )
-}
-
-function SearchResult({ channel, onAdd }) {
-  const [minAge, setMinAge] = useState(1)
-  const [maxAge, setMaxAge] = useState(15)
-  return (
-    <div className="d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2">
-      <img src={channel.thumbnail} alt="" width="48" height="48" className="rounded-circle" />
-      <span className="me-auto fw-semibold text-truncate">{channel.channel_title}</span>
-      <label className="text-secondary small">
-        ages{' '}
-        <input
-          type="number"
-          min="1"
-          max="15"
-          value={minAge}
-          onChange={e => setMinAge(+e.target.value)}
-          className="form-control d-inline-block age-input"
-        />
-        {' – '}
-        <input
-          type="number"
-          min="1"
-          max="15"
-          value={maxAge}
-          onChange={e => setMaxAge(+e.target.value)}
-          className="form-control d-inline-block age-input"
-        />
-      </label>
-      <button
-        type="button"
-        className="btn btn-danger"
-        onClick={() =>
-          onAdd({ ...channel, min_age: Math.min(minAge, maxAge), max_age: Math.max(minAge, maxAge) })
-        }
-      >
-        <i className="fa-sharp-duotone fa-regular fa-plus me-1" />
-        Add
-      </button>
     </div>
   )
 }
 
-function ChannelListSection({ curated, store }) {
-  const { settings } = store
+function AgeCell({ row, field, store }) {
+  const ch = row.original
+  const save = ch.custom
+    ? patch => store.updateCustomChannel(ch.channel_id, patch)
+    : patch => store.setOverride(ch.channel_id, patch)
   return (
-    <section>
-      <h2 className="fs-5 text-secondary">
-        <i className="fa-sharp-duotone fa-regular fa-tv-retro me-2" />
-        Channels
-      </h2>
-      {settings.customChannels.map(ch => (
-        <ChannelRow key={ch.channel_id} channel={ch} thumbnail={ch.thumbnail} range={[ch.min_age, ch.max_age]}>
+    <input
+      type="number"
+      min="1"
+      max="15"
+      className="form-control form-control-sm age-input"
+      value={ch[field]}
+      onChange={e => save({ [field]: +e.target.value })}
+    />
+  )
+}
+
+function ChannelTable({ db, store }) {
+  const { customChannels, overrides } = store.settings
+  const hiddenCount = Object.values(overrides).filter(o => o.hidden).length
+
+  const data = useMemo(
+    () => [
+      ...customChannels.map(ch => ({ ...ch, custom: true })),
+      ...curatedChannels(db, overrides).filter(ch => !ch.hidden),
+    ],
+    [db, customChannels, overrides],
+  )
+
+  const columns = useMemo(
+    () => [
+      {
+        header: 'Channel',
+        accessorKey: 'channel_title',
+        cell: ({ row }) => {
+          const ch = row.original
+          const avatar = ch.thumbnail ?? ch.videos?.[0]?.thumbnail
+          return (
+            <a
+              href={channelUrl(ch)}
+              target="_blank"
+              rel="noreferrer"
+              className="fw-semibold d-inline-flex align-items-center gap-2"
+            >
+              {avatar && <img src={avatar} alt="" width="36" height="36" className="rounded-circle object-fit-cover" />}
+              {ch.channel_title}
+            </a>
+          )
+        },
+      },
+      { header: 'Min age', id: 'min_age', cell: props => <AgeCell {...props} field="min_age" store={store} /> },
+      { header: 'Max age', id: 'max_age', cell: props => <AgeCell {...props} field="max_age" store={store} /> },
+      {
+        id: 'delete',
+        header: '',
+        cell: ({ row }) => (
           <button
             type="button"
-            className="btn btn-outline-danger"
-            aria-label={`Remove ${ch.channel_title}`}
+            className="btn btn-outline-danger btn-sm"
+            aria-label={`Delete ${row.original.channel_title}`}
             onClick={() => {
-              store.removeCustomChannel(ch.channel_id)
-              evictChannelCache(ch.channel_id)
+              const ch = row.original
+              if (ch.custom) {
+                store.removeCustomChannel(ch.channel_id)
+                evictChannelCache(ch.channel_id)
+              } else {
+                store.setOverride(ch.channel_id, { hidden: true })
+              }
             }}
           >
             <i className="fa-sharp-duotone fa-regular fa-trash" />
           </button>
-        </ChannelRow>
-      ))}
-      {curated.map(ch => {
-        const hidden = settings.hiddenChannels.includes(ch.channel_id)
-        return (
-          <ChannelRow
-            key={ch.channel_id}
-            channel={ch}
-            thumbnail={ch.videos[0]?.thumbnail}
-            range={[ch.min_age, ch.max_age]}
-            dimmed={hidden}
-          >
-            <button
-              type="button"
-              className={`btn ${hidden ? 'btn-outline-secondary' : 'btn-outline-light'}`}
-              aria-label={`${hidden ? 'Show' : 'Hide'} ${ch.channel_title}`}
-              onClick={() => store.toggleHidden(ch.channel_id)}
-            >
-              <i className={`fa-sharp-duotone fa-regular ${hidden ? 'fa-eye-slash' : 'fa-eye'}`} />
-            </button>
-          </ChannelRow>
-        )
-      })}
-    </section>
+        ),
+      },
+    ],
+    [store],
   )
-}
 
-function ChannelRow({ channel, thumbnail, range, dimmed = false, children }) {
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() })
+
   return (
-    <div className={`d-flex align-items-center gap-3 rounded p-2 mt-2 bg-body-tertiary ${dimmed ? 'opacity-50' : ''}`}>
-      {thumbnail ? (
-        <img src={thumbnail} alt="" width="48" height="48" className="rounded object-fit-cover" />
-      ) : (
-        <i className="fa-sharp-duotone fa-regular fa-tv-retro fa-2x" style={{ width: 48 }} />
+    <>
+      <table className="table table-dark table-hover align-middle">
+        <thead>
+          {table.getHeaderGroups().map(hg => (
+            <tr key={hg.id}>
+              {hg.headers.map(h => (
+                <th key={h.id} className="text-secondary fw-normal">
+                  {flexRender(h.column.columnDef.header, h.getContext())}
+                </th>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {table.getRowModel().rows.map(row => (
+            <tr key={row.id}>
+              {row.getVisibleCells().map(cell => (
+                <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          className="btn btn-link btn-sm text-secondary"
+          onClick={() => store.restoreHidden()}
+        >
+          restore {hiddenCount} deleted built-in channel{hiddenCount > 1 ? 's' : ''}
+        </button>
       )}
-      <span className="me-auto fw-semibold text-truncate">{channel.channel_title}</span>
-      <span className="badge text-bg-dark">ages {range[0]}–{range[1]}</span>
-      {children}
-    </div>
+    </>
   )
 }
