@@ -25,21 +25,9 @@ function load() {
   }
 }
 
-export default function useSettings() {
-  const [settings, setSettings] = useState(load)
-
-  const update = useCallback(patch => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch }
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next))
-      } catch (e) {
-        console.error('settings persist failed', e)
-      }
-      return next
-    })
-  }, [])
-
+// mutator API over a settings object; `update` takes shallow patches. Shared
+// by the persistent store below and the Settings page's unsaved draft.
+export function storeApi(settings, update) {
   return {
     settings,
     setApiKey: apiKey => update({ apiKey: apiKey.trim() }),
@@ -66,4 +54,22 @@ export default function useSettings() {
       }),
     setPasskey: id => update({ passkeyId: id }),
   }
+}
+
+export default function useSettings() {
+  const [settings, setSettings] = useState(load)
+
+  const update = useCallback(patch => {
+    setSettings(prev => {
+      const next = { ...prev, ...patch }
+      try {
+        localStorage.setItem(KEY, JSON.stringify(next))
+      } catch (e) {
+        console.error('settings persist failed', e)
+      }
+      return next
+    })
+  }, [])
+
+  return { ...storeApi(settings, update), save: update }
 }

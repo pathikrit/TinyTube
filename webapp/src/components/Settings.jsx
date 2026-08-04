@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
 import { curatedChannels, overlaps } from '../lib/channels.js'
+import { storeApi } from '../hooks/useSettings.js'
 import { searchChannels, resolveChannel, evictChannelCache, formatSubscribers } from '../lib/youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
@@ -8,25 +9,68 @@ const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim()
 const channelUrl = ch => ch.source_url ?? `https://www.youtube.com/channel/${ch.channel_id}`
 
 export default function Settings({ db, store, onDone }) {
+  // edits accumulate in an in-memory draft; localStorage is only touched by
+  // Save, which appears once the draft diverges (back/edge-swipe discards)
+  const [settings, setSettings] = useState(store.settings)
+  const draft = storeApi(settings, patch => setSettings(prev => ({ ...prev, ...patch })))
+  const dirty = JSON.stringify(settings) !== JSON.stringify(store.settings)
+
   return (
     <div className="settings container-xl py-4">
       <div className="d-flex align-items-center mb-4">
         <h1 className="fs-3 fw-bold m-0 me-auto">
-          <i className="fa-sharp-duotone fa-regular fa-family me-2 text-danger" />
+          <i className="fa-sharp-duotone fa-solid fa-remote me-2 text-danger" />
           Settings
         </h1>
-        <button type="button" className="btn btn-danger btn-lg" onClick={onDone}>
-          <i className="fa-sharp-duotone fa-regular fa-check me-2" />
-          Done
-        </button>
+        {dirty && (
+          <button
+            type="button"
+            className="btn btn-danger btn-lg"
+            onClick={() => {
+              store.save(settings)
+              onDone()
+            }}
+          >
+            <i className="fa-sharp-duotone fa-regular fa-check me-2" />
+            Save
+          </button>
+        )}
       </div>
 
-      <AgeRow value={store.settings.ageRange} onChange={store.setAgeRange} />
-      <ApiKeyRow apiKey={store.settings.apiKey} onChange={store.setApiKey} />
-      <SearchRow apiKey={store.settings.apiKey} store={store} />
-      <ChannelTable db={db} store={store} />
+      <AgeRow value={settings.ageRange} onChange={draft.setAgeRange} />
+      <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
+      <SearchRow apiKey={settings.apiKey} store={draft} />
+      <ChannelTable db={db} store={draft} />
       <VersionFooter />
     </div>
+  )
+}
+
+function ConfirmModal({ title, body, onConfirm, onCancel }) {
+  return (
+    <>
+      <div className="modal d-block" tabIndex="-1" role="dialog" onClick={onCancel}>
+        <div className="modal-dialog modal-dialog-centered" onClick={e => e.stopPropagation()}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">{title}</h5>
+              <button type="button" className="btn-close" aria-label="Close" onClick={onCancel} />
+            </div>
+            <div className="modal-body">{body}</div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={onCancel}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" onClick={onConfirm}>
+                <i className="fa-sharp-duotone fa-regular fa-trash me-2" />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="modal-backdrop show" />
+    </>
   )
 }
 
@@ -78,8 +122,8 @@ function AgeRow({ value, onChange }) {
   return (
     <div className="d-flex align-items-center gap-3 mb-3">
       <span className="text-secondary text-nowrap">
-        <i className="fa-sharp-duotone fa-regular fa-children me-2" />
-        Age:
+        <i className="fa-duotone fa-solid fa-children me-2" />
+        Age
       </span>
       <DualAgeSlider value={value} onChange={onChange} />
     </div>
@@ -87,6 +131,7 @@ function AgeRow({ value, onChange }) {
 }
 
 function ApiKeyRow({ apiKey, onChange }) {
+  const [confirming, setConfirming] = useState(false)
   return (
     <div className="d-flex align-items-center gap-3 mb-3">
       <span className="text-secondary text-nowrap">
@@ -97,10 +142,31 @@ function ApiKeyRow({ apiKey, onChange }) {
         type="password"
         className="form-control"
         placeholder="AIza… (needed to add channels)"
-        defaultValue={apiKey}
-        onBlur={e => onChange(e.target.value)}
+        value={apiKey}
+        onChange={e => onChange(e.target.value)}
         autoComplete="off"
       />
+      {apiKey && (
+        <button
+          type="button"
+          className="btn btn-outline-danger btn-sm"
+          aria-label="Delete API key"
+          onClick={() => setConfirming(true)}
+        >
+          <i className="fa-sharp-duotone fa-regular fa-trash" />
+        </button>
+      )}
+      {confirming && (
+        <ConfirmModal
+          title="Delete API key?"
+          body="You won't be able to search for or add channels until you enter a new key."
+          onConfirm={() => {
+            onChange('')
+            setConfirming(false)
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </div>
   )
 }
@@ -148,7 +214,7 @@ function SearchRow({ apiKey, store }) {
     <div className="mb-3">
       <div className="d-flex align-items-center gap-3">
         <span className="text-secondary text-nowrap">
-          <i className="fa-sharp-duotone fa-regular fa-magnifying-glass me-2" />
+          <i className="fa-brands fa-youtube me-2" />
           Add Channel
         </span>
         <div className="position-relative flex-grow-1">
@@ -241,7 +307,7 @@ function ChannelTable({ db, store }) {
         },
       },
       {
-        header: 'Ages',
+        header: 'Age',
         id: 'ages',
         cell: ({ row }) => <ChannelAgeSlider ch={row.original} store={store} />,
       },
