@@ -20,18 +20,14 @@ export default function EnrollGate({ onEnrolled }) {
   }
 
   return (
-    <div className="math-gate d-flex flex-column align-items-center justify-content-center gap-4 p-4 text-center">
+    <div className="math-gate enroll-gate d-flex flex-column align-items-center justify-content-center gap-4 p-4 text-center">
       <span className="fs-3 fw-bold">
         <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
         TinyTube
       </span>
-      <i className="fa-sharp-duotone fa-regular fa-fingerprint fa-4x text-danger" />
-      <p className="fs-5 text-secondary m-0" style={{ maxWidth: 420 }}>
-        Grown-up setup: register your fingerprint or face to lock the parent settings.
-      </p>
       <button type="button" className="btn btn-danger btn-lg px-5 py-3 fs-4" onClick={start}>
         <i className="fa-sharp-duotone fa-regular fa-fingerprint me-2" />
-        Enable
+        Enter
       </button>
       {error && <div className="alert alert-warning py-2">{error} — try again</div>}
     </div>

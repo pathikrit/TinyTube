@@ -45,9 +45,9 @@ describe('first-run enrollment', () => {
   it('blocks everything with the enroll screen on a biometric device until enrolled', async () => {
     isBiometricAvailable.mockResolvedValueOnce(true)
     render(<App />)
-    expect(await screen.findByText(/Grown-up setup/)).toBeTruthy()
+    expect(await screen.findByText('Enter')).toBeTruthy()
     expect(screen.queryByLabelText('Parents')).toBeNull() // no gallery behind it
-    fireEvent.click(screen.getByText('Enable'))
+    fireEvent.click(screen.getByText('Enter'))
     expect(await screen.findByLabelText('Parents')).toBeTruthy() // gallery after enrolling
     expect(JSON.parse(localStorage.getItem('tinytube:settings:v1')).passkeyId).toBe('fresh-credential')
   })
@@ -57,7 +57,7 @@ describe('first-run enrollment', () => {
     localStorage.setItem('tinytube:settings:v1', JSON.stringify({ passkeyId: 'abc' }))
     render(<App />)
     expect(await screen.findByLabelText('Parents')).toBeTruthy()
-    expect(screen.queryByText(/Grown-up setup/)).toBeNull()
+    expect(screen.queryByText('Enter')).toBeNull()
   })
 })
 

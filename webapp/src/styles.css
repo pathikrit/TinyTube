@@ -72,8 +72,12 @@ html, body, #root {
   min-height: 100%;
   padding-top: calc(1.5rem + env(safe-area-inset-top));
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
-  /* the global kid-proof user-select:none must not apply here — parents
-     need to select/paste (API key, channel URLs) */
+}
+
+/* the global kid-proof user-select:none must not apply on grown-up pages —
+   parents need to select/paste (API key, channel URLs) */
+.settings,
+.enroll-gate {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;
