@@ -1,36 +1,12 @@
 [
-  {
-    "min_age": 2,
-    "max_age": 4,
-    "channels": [
-      "https://www.youtube.com/@msrachel",
-      "https://www.youtube.com/@Blippi"
-    ]
-  },
-  {
-    "min_age": 3,
-    "max_age": 7,
-    "channels": [
-      "https://www.youtube.com/@Numberblocks",
-      "https://www.youtube.com/@OfficialAlphablocks",
-      "https://www.youtube.com/@TheDadLab"
-    ]
-  },
-  {
-    "min_age": 5,
-    "max_age": 10,
-    "channels": [
-      "https://www.youtube.com/@SciShowKids",
-      "https://www.youtube.com/@maddiemoate",
-      "https://www.youtube.com/@freeschool",
-      "https://www.youtube.com/@MysterySci"
-    ]
-  },
-  {
-    "min_age": 8,
-    "max_age": 12,
-    "channels": [
-      "https://www.youtube.com/@JaredOwen"
-    ]
-  }
+  { "channel": "msrachel", "min_age": 2, "max_age": 4 },
+  { "channel": "Blippi", "min_age": 2, "max_age": 4 },
+  { "channel": "Numberblocks", "min_age": 3, "max_age": 7 },
+  { "channel": "OfficialAlphablocks", "min_age": 3, "max_age": 7 },
+  { "channel": "TheDadLab", "min_age": 3, "max_age": 7 },
+  { "channel": "SciShowKids", "min_age": 5, "max_age": 10 },
+  { "channel": "maddiemoate", "min_age": 5, "max_age": 10 },
+  { "channel": "freeschool", "min_age": 5, "max_age": 10 },
+  { "channel": "MysterySci", "min_age": 5, "max_age": 10 },
+  { "channel": "JaredOwen", "min_age": 8, "max_age": 12 }
 ]

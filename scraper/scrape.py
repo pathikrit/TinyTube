@@ -26,12 +26,14 @@ ATOM_NS = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml
 
 
 def normalize(url: str) -> str:
-    """@handle | UCxxxx | any youtube.com URL -> canonical https://www.youtube.com/... URL."""
+    """bare name | @handle | UCxxxx | any youtube.com URL -> canonical https://www.youtube.com/... URL."""
     u = url.strip().rstrip("/")
-    if u.startswith("@"):
-        return f"https://www.youtube.com/{u}"
     if re.fullmatch(UC_ID, u):
         return f"https://www.youtube.com/channel/{u}"
+    if u.startswith("@"):
+        return f"https://www.youtube.com/{u}"
+    if re.fullmatch(r"[\w.-]+", u):  # bare channel name, e.g. "JaredOwen" -> @JaredOwen
+        return f"https://www.youtube.com/@{u}"
     return re.sub(r"^(https?://)?(www\.|m\.)?youtube\.com", "https://www.youtube.com", u)
 
 
@@ -67,10 +69,16 @@ def scrape_ytdlp(url: str, max_videos: int) -> dict:
     ]
     if not videos:
         raise RuntimeError("yt-dlp returned no videos")
+    thumbs = info.get("thumbnails") or []
+    avatar = next(
+        (t["url"] for t in thumbs if t.get("id") == "avatar_uncropped"),
+        next((t["url"] for t in thumbs if t.get("width") and t.get("width") == t.get("height")), None),
+    )
     return {
         "channel_id": info.get("channel_id") or info.get("uploader_id"),
         "channel_title": (info.get("channel") or info.get("title", "")).removesuffix(" - Videos"),
-        "source_url": url,
+        "thumbnail": avatar,
+        "source_url": normalize(url),
         "videos": videos,
     }
 
@@ -95,7 +103,8 @@ def scrape_rss(url: str) -> dict:
     return {
         "channel_id": channel_id,
         "channel_title": root.findtext("a:title", "", ATOM_NS),
-        "source_url": url,
+        "thumbnail": None,
+        "source_url": normalize(url),
         "videos": videos,
     }
 
@@ -106,7 +115,7 @@ def scrape_channel(url: str, max_videos: int, seed: dict) -> dict | None:
             return method()
         except Exception as e:
             print(f"  {url}: {type(e).__name__}: {e}", file=sys.stderr)
-    stale = seed.get(url)
+    stale = seed.get(normalize(url))
     if stale:
         print(f"  {url}: using stale data from seed ({len(stale['videos'])} videos)", file=sys.stderr)
     else:
@@ -115,13 +124,14 @@ def scrape_channel(url: str, max_videos: int, seed: dict) -> dict | None:
 
 
 def load_seed(path: str | None) -> dict:
-    """Previous videos.json -> {source_url: channel blob}."""
+    """Previous videos.json (flat v2 or grouped v1) -> {source_url: channel blob}."""
     if not path:
         return {}
     try:
         with open(path) as f:
             prev = json.load(f)
-        return {ch["source_url"]: ch for group in prev["groups"] for ch in group["channels"]}
+        channels = prev.get("channels") or [ch for g in prev.get("groups", []) for ch in g["channels"]]
+        return {ch["source_url"]: ch for ch in channels}
     except Exception as e:
         print(f"seed {path} unusable ({e}); continuing without", file=sys.stderr)
         return {}
@@ -136,28 +146,26 @@ def main() -> None:
     args = parser.parse_args()
 
     with open(args.channels) as f:
-        groups = json.load(f)
+        entries = json.load(f)
     seed = load_seed(args.seed)
 
-    out_groups, total = [], 0
-    for group in groups:
-        print(f"ages {group['min_age']}-{group['max_age']}:")
-        channels = []
-        for url in group["channels"]:
-            blob = scrape_channel(url, args.max_videos, seed)
-            if blob:
-                channels.append(blob)
-                total += len(blob["videos"])
-                print(f"  {blob['channel_title']}: {len(blob['videos'])} videos")
-        out_groups.append({"min_age": group["min_age"], "max_age": group["max_age"], "channels": channels})
+    channels, total = [], 0
+    for entry in entries:
+        blob = scrape_channel(entry["channel"], args.max_videos, seed)
+        if blob:
+            blob["min_age"] = entry.get("min_age", 1)
+            blob["max_age"] = entry.get("max_age", 15)
+            channels.append(blob)
+            total += len(blob["videos"])
+            print(f"{blob['channel_title']} (ages {blob['min_age']}-{blob['max_age']}): {len(blob['videos'])} videos")
 
     if total == 0:
         sys.exit("FATAL: scraped zero videos across all channels")
 
     out = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "groups": out_groups,
+        "channels": channels,
     }
     with open(args.out, "w") as f:
         json.dump(out, f, indent=1)
