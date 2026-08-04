@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useVideos from './hooks/useVideos.js'
 import useWatchStore from './hooks/useWatchStore.js'
 import useSettings from './hooks/useSettings.js'
@@ -13,6 +13,23 @@ export default function App() {
   const watchStore = useWatchStore()
   const [current, setCurrent] = useState(null) // video being played, or null
   const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'parent'
+
+  // player/gate/parent are history entries so the browser back button
+  // (and iOS edge-swipe) lands back on the gallery instead of leaving the app
+  useEffect(() => {
+    const onPop = () => {
+      setCurrent(null)
+      setView('gallery')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const open = fn => arg => {
+    history.pushState({ tinytube: true }, '')
+    fn(arg)
+  }
+  const close = () => history.back() // popstate does the state reset
 
   if (error) {
     return (
@@ -34,23 +51,23 @@ export default function App() {
   }
 
   if (current) {
-    return <PlayerView video={current} watchStore={watchStore} onExit={() => setCurrent(null)} />
+    return <PlayerView video={current} watchStore={watchStore} onExit={close} />
   }
 
   if (view === 'gate') {
     return (
       <MathGate
-        onPass={() => setView('parent')}
+        onPass={() => setView('parent')} // same history depth: back from parent -> gallery
         onFail={() => {
           store.lockParents()
-          setView('gallery')
+          close()
         }}
       />
     )
   }
 
   if (view === 'parent') {
-    return <ParentMode db={db} store={store} onDone={() => setView('gallery')} />
+    return <ParentMode db={db} store={store} onDone={close} />
   }
 
   return (
@@ -58,8 +75,8 @@ export default function App() {
       channels={channels}
       watchStore={watchStore}
       parentLockUntil={store.settings.parentLockUntil}
-      onPlay={setCurrent}
-      onParents={() => setView('gate')}
+      onPlay={open(setCurrent)}
+      onParents={open(() => setView('gate'))}
     />
   )
 }
