@@ -17,7 +17,7 @@ channels.json ─▶ scraper (yt-dlp, GH Actions cron) ─▶ webapp/public/vide
 ## Make targets (top-level Makefile; the only entry points)
 
 - `make download` — scrape channels → `webapp/public/videos.json`
-- `make dev` — download (if missing) + vite dev server (`http://localhost:5173/tinytube/?age=5`)
+- `make dev` — download (if missing) + vite dev server (`http://localhost:5173?age=5`; the `/TinyTube/` base path applies only to production builds)
 - `make test` — test suite (placeholder for now); called by `make prod`
 - `make prod` — download + test + `vite build`; what CI runs
 
@@ -25,12 +25,12 @@ channels.json ─▶ scraper (yt-dlp, GH Actions cron) ─▶ webapp/public/vide
 
 - **Age filter**: `?age=N` URL param selects groups where `min_age ≤ N ≤ max_age`; no param → all groups. There is intentionally no in-app age switcher (tamper-proofing).
 - **Kid-proof player** (`webapp/src/components/VideoPlayer.jsx`): youtube-nocookie embed with `controls:0, rel:0, fs:0, disablekb:1`; a transparent `TouchShield` swallows all touches; any non-playing state shows the opaque `PausedOverlay` so YouTube's "More videos" tray / end screen is never visible or tappable; ENDED → mark watched → back to gallery (no auto-advance).
-- **Gallery sort** (`webapp/src/hooks/useWatchStore.js: gallerySort`): (1) in-progress 20–95% watched, closest-to-finish first; (2) unwatched, round-robin interleaved across channels so high-volume channels can't flood quiet ones; (3) abandoned <20%; (4) watched >95% last, hidden by the "Hide watched" toggle. `is_watched` = >95% because the tail is usually credits.
+- **Gallery sort** (`webapp/src/hooks/useWatchStore.js: gallerySort`): (1) in-progress 20–95% watched, closest-to-finish first; (2) unwatched, round-robin interleaved across channels so high-volume channels can't flood quiet ones; (3) abandoned <20%; (4) watched >95% last. `is_watched` = >95% because the tail is usually credits.
 - **localStorage** key `tinytube:v1`: `{lastVideoId, watched: {id: {pos, dur, completed, updatedAt}}}`, LRU-capped at 500, saved every 5 s while playing.
 
 ## Deploy
 
-`.github/workflows/deploy.yml`: push to `master` + daily cron + manual → `make prod` → GitHub Pages (`https://pathikrit.github.io/tinytube/`). Vite `base` comes from `BASE_PATH` env (defaults to `/tinytube/`). GitHub repo setting required once: Settings → Pages → Source = "GitHub Actions".
+`.github/workflows/deploy.yml`: push to `master` + daily cron + manual → `make prod` → GitHub Pages (`https://pathikrit.github.io/TinyTube/`). Vite `base` comes from `BASE_PATH` env (defaults to `/TinyTube/`, build only). GitHub repo setting required once: Settings → Pages → Source = "GitHub Actions".
 
 ## Conventions
 

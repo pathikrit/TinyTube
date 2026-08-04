@@ -8,11 +8,11 @@ download: ## scrape approved channels -> webapp/public/videos.json
 $(VIDEOS):
 	$(MAKE) download
 
-dev: $(VIDEOS) ## local dev server (http://localhost:5173/tinytube/?age=5)
+dev: $(VIDEOS) ## local dev server (http://localhost:5173?age=5)
 	cd webapp && npm install && npm run dev -- --host
 
 test: ## test suite; also called in CI
 	@echo "no tests yet"
 
-prod: download test ## used by gh-actions: package site for pathikrit.github.io/tinytube
+prod: download test ## used by gh-actions: package site for pathikrit.github.io/TinyTube
 	cd webapp && npm ci && npm run build

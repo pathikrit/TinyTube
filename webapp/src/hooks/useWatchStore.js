@@ -75,9 +75,9 @@ function roundRobin(lists) {
  * 2. fresh videos, round-robin across channels (newest first within a channel)
  *    so a high-volume channel can't flood out a quiet one
  * 3. abandoned (<20%, started but bailed), same round-robin
- * 4. watched (>95%), or hidden entirely when hideWatched
+ * 4. watched (>95%) last
  */
-export function gallerySort(channels, watched, hideWatched) {
+export function gallerySort(channels, watched) {
   const inProgress = []
   const freshPerChannel = []
   const abandonedPerChannel = []
@@ -104,6 +104,6 @@ export function gallerySort(channels, watched, hideWatched) {
     ...inProgress.map(x => x.v),
     ...roundRobin(freshPerChannel),
     ...roundRobin(abandonedPerChannel),
-    ...(hideWatched ? [] : done),
+    ...done,
   ]
 }
