@@ -22,7 +22,7 @@ export default function EnrollGate({ onEnrolled }) {
   return (
     <div className="math-gate d-flex flex-column align-items-center justify-content-center gap-4 p-4 text-center">
       <span className="fs-3 fw-bold">
-        <i className="fa-sharp-duotone fa-regular fa-tv-retro me-2 text-danger" />
+        <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
         TinyTube
       </span>
       <i className="fa-sharp-duotone fa-regular fa-fingerprint fa-4x text-danger" />

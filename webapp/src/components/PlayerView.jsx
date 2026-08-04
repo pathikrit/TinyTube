@@ -26,7 +26,7 @@ export default function PlayerView({ video, watchStore, onExit }) {
           <i className="fa-sharp-duotone fa-regular fa-arrow-left" />
         </button>
         <span className="fs-5 fw-bold">
-          <i className="fa-sharp-duotone fa-regular fa-tv-retro me-2 text-danger" />
+          <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
           TinyTube
         </span>
       </nav>
