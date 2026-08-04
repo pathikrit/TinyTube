@@ -136,13 +136,7 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
         <PausedOverlay video={video} onPlay={togglePlay} onExit={onExit} />
       )}
       {(showControls || (ready && !active)) && (
-        <ControlsBar
-          playing={playing}
-          progress={progress}
-          onTogglePlay={togglePlay}
-          onSeek={seekBy}
-          onExit={onExit}
-        />
+        <ControlsBar playing={playing} progress={progress} onTogglePlay={togglePlay} onSeek={seekBy} />
       )}
     </div>
   )
