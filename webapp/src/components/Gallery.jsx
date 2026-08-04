@@ -40,7 +40,7 @@ export default function Gallery({ channels, watchStore, parentLockUntil, onPlay,
       <div className="container-fluid py-3">
         <div className="row g-3">
           {videos.map(video => (
-            <div key={video.id} className="col-6 col-md-4 col-lg-3">
+            <div key={video.id} className="col-4 col-md-3 col-lg-2">
               <VideoCard
                 video={video}
                 entry={watchStore.watched[video.id]}
