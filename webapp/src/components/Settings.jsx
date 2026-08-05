@@ -24,7 +24,8 @@ export default function Settings({ db, store, onDone }) {
         </h1>
         {dirty && (
           <button
-            type="button"
+            type="submit"
+            form="api-key-form"
             className="btn btn-danger btn-lg"
             onClick={() => {
               store.save(settings)
@@ -138,14 +139,25 @@ function ApiKeyRow({ apiKey, onChange }) {
         <i className="fa-sharp-duotone fa-regular fa-key me-2" />
         <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>
       </span>
-      <input
-        type="password"
-        className="form-control"
-        placeholder="AIza… (needed to add channels)"
-        value={apiKey}
-        onChange={e => onChange(e.target.value)}
-        autoComplete="off"
-      />
+      {/* real <form> + username/current-password hints so the browser's
+          password manager offers to save the key; Save submits it via
+          form="api-key-form" and preventDefault keeps the SPA in place */}
+      <form
+        id="api-key-form"
+        className="d-flex align-items-center gap-3 flex-grow-1"
+        onSubmit={e => e.preventDefault()}
+      >
+        <input type="text" name="username" value="youtube-api-key" autoComplete="username" readOnly hidden />
+        <input
+          type="password"
+          name="api-key"
+          className="form-control"
+          placeholder="AIza… (needed to add channels)"
+          value={apiKey}
+          onChange={e => onChange(e.target.value)}
+          autoComplete="current-password"
+        />
+      </form>
       {apiKey && (
         <button
           type="button"
