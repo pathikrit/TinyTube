@@ -1,5 +1,6 @@
-/** Onboarding + parent gates: biometric enrollment on first run, and the
- * math-gate fallback for devices without a platform authenticator. */
+/** Onboarding + parent gates: biometric enrollment on first run, the
+ * math-gate fallback for devices without a platform authenticator, and the
+ * watch-quota-exceeded screen. */
 
 import { useEffect, useState } from 'react'
 import { enroll, makeChallenge } from './lib.js'
@@ -33,6 +34,26 @@ export function EnrollGate({ onEnrolled }) {
         Enter
       </button>
       {error && <div className="alert alert-warning py-2">{error} — try again</div>}
+    </div>
+  )
+}
+
+/** Shown when the watch quota is spent: only a grown-up (via the parent gate)
+ * can grant more time, from the settings screen. */
+export function QuotaGate({ onParents, onBack }) {
+  return (
+    <div className="math-gate d-flex flex-column align-items-center justify-content-center gap-4 p-4 text-center">
+      <i className="fa-sharp-duotone fa-regular fa-stopwatch fa-3x text-danger" />
+      <div className="fs-3 fw-bold">Watch Quota Exceeded</div>
+      <div className="fs-5 text-secondary">Time for a break! A grown-up can add more time.</div>
+      <button type="button" className="btn btn-danger btn-lg px-5" onClick={onParents}>
+        <i className="fa-sharp-duotone fa-regular fa-family me-2" />
+        Parents
+      </button>
+      <button type="button" className="btn btn-outline-light" onClick={onBack}>
+        <i className="fa-sharp-duotone fa-regular fa-grid-2 me-2" />
+        Back to videos
+      </button>
     </div>
   )
 }

@@ -141,6 +141,7 @@ const SETTINGS_KEY = 'tinytube:settings:v1'
 export const DEFAULTS = {
   apiKey: '',
   ageRange: [1, 15], // everything
+  quotaMins: 180, // watch quota per rolling 12h window; 0 = no watching (there is no "off")
   customChannels: [], // parent-added, same flat shape as channels.json entries: [{channel_id, channel_title, thumbnail, min_age, max_age}]
   overrides: {}, // per curated channel_id: {min_age?, max_age?, hidden?, disabled?} edited in the table
   passkeyId: null, // WebAuthn credential id (base64url); when set, the parent gate is biometric-only
@@ -168,6 +169,7 @@ export function storeApi(settings, update) {
     settings,
     setApiKey: apiKey => update({ apiKey: apiKey.trim() }),
     setAgeRange: ([lo, hi]) => update({ ageRange: [Math.min(lo, hi), Math.max(lo, hi)] }),
+    setQuotaMins: quotaMins => update({ quotaMins }),
     addCustomChannel: ch =>
       update({
         customChannels: [...settings.customChannels.filter(c => c.channel_id !== ch.channel_id), ch],
@@ -211,6 +213,61 @@ export function useSettings() {
 }
 
 // ---------------------------------------------------------------------------
+// watch quota — cumulative PLAYING seconds against a parent-set cap
+// (settings.quotaMins) per rolling 12h window. The window starts at the first
+// counted second and expires lazily on read; no timers anywhere. Day/hour
+// buckets exist only to feed the parent-facing stats table.
+
+export const QUOTA_WINDOW_MS = 12 * 3600_000
+const HOUR_MS = 3600_000
+const DAY_MS = 86_400_000
+const EMPTY_USAGE = { window: { start: null, secs: 0 }, days: {}, hours: {} }
+
+const pad2 = n => String(n).padStart(2, '0')
+const localDate = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
+/** "3h", "1h 45m", "45m", "0m" */
+export function fmtMins(mins) {
+  const h = Math.floor(mins / 60)
+  const m = Math.round(mins % 60)
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`
+}
+
+/** Seconds used in the current 12h window; 0 if none, expired, or the clock ran backwards. */
+export function windowUsed(usage, now = Date.now()) {
+  const { start, secs } = usage?.window ?? {}
+  return start != null && now >= start && now - start < QUOTA_WINDOW_MS ? secs : 0
+}
+
+/** Count watched seconds: extend (or start) the 12h window and bump the stats buckets. */
+export function accrueUsage(usage, secs, now = Date.now()) {
+  const window = { start: windowUsed(usage, now) ? usage.window.start : now, secs: windowUsed(usage, now) + secs }
+  const dayKey = localDate(new Date(now))
+  const days = { ...usage.days, [dayKey]: (usage.days[dayKey] ?? 0) + secs }
+  const oldestDay = localDate(new Date(now - 366 * DAY_MS)) // YYYY-MM-DD compares lexicographically
+  for (const k of Object.keys(days)) if (k < oldestDay) delete days[k]
+  const hourKey = Math.floor(now / HOUR_MS)
+  const hours = { ...usage.hours, [hourKey]: (usage.hours[hourKey] ?? 0) + secs }
+  for (const k of Object.keys(hours)) if (+k < hourKey - 48) delete hours[k]
+  return { window, days, hours }
+}
+
+/** Parent-facing stats, all in seconds. Session = the current 12h quota window; WTD weeks start Sunday. */
+export function usageStats(usage, now = Date.now()) {
+  const d = new Date(now)
+  const daysSince = key =>
+    Object.entries(usage.days).reduce((total, [k, secs]) => (k >= key ? total + secs : total), 0)
+  const nowHour = Math.floor(now / HOUR_MS)
+  return {
+    session: windowUsed(usage, now),
+    last24h: Object.entries(usage.hours).reduce((total, [k, secs]) => (+k > nowHour - 24 ? total + secs : total), 0),
+    wtd: daysSince(localDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay()))),
+    mtd: daysSince(localDate(new Date(d.getFullYear(), d.getMonth(), 1))),
+    ytd: daysSince(localDate(new Date(d.getFullYear(), 0, 1))),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // useWatchStore
 
 const WATCH_KEY = 'tinytube:v1'
@@ -220,9 +277,10 @@ const LIKED_THRESHOLD = 0.2 // bailed before this -> probably didn't like it
 
 function loadWatchStore() {
   try {
-    return JSON.parse(localStorage.getItem(WATCH_KEY)) ?? { lastVideoId: null, watched: {} }
+    const parsed = JSON.parse(localStorage.getItem(WATCH_KEY)) ?? {}
+    return { lastVideoId: null, watched: {}, ...parsed, usage: { ...EMPTY_USAGE, ...parsed.usage } }
   } catch {
-    return { lastVideoId: null, watched: {} }
+    return { lastVideoId: null, watched: {}, usage: EMPTY_USAGE }
   }
 }
 
@@ -249,6 +307,7 @@ export function useWatchStore() {
       const entry = prev.watched[id]
       const completed = (entry?.completed ?? false) || (dur > 0 && pos / dur > WATCHED_THRESHOLD)
       const next = {
+        ...prev,
         lastVideoId: id,
         watched: { ...prev.watched, [id]: { pos, dur, completed, updatedAt: Date.now() } },
       }
@@ -261,6 +320,7 @@ export function useWatchStore() {
     setStore(prev => {
       const entry = prev.watched[id] ?? { pos: 0, dur: 0 }
       const next = {
+        ...prev,
         lastVideoId: id,
         watched: { ...prev.watched, [id]: { ...entry, completed: true, updatedAt: Date.now() } },
       }
@@ -269,7 +329,15 @@ export function useWatchStore() {
     })
   }, [])
 
-  return { watched: store.watched, saveProgress, markCompleted }
+  const addWatchTime = useCallback(secs => {
+    setStore(prev => {
+      const next = { ...prev, usage: accrueUsage(prev.usage, secs) }
+      persist(next)
+      return next
+    })
+  }, [])
+
+  return { watched: store.watched, usage: store.usage, saveProgress, markCompleted, addWatchTime }
 }
 
 /** Interleave lists round-robin: first item of each list, then second of each, ... */

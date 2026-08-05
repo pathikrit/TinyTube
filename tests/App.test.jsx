@@ -12,6 +12,9 @@ vi.mock('../src/lib.js', async importOriginal => ({
 }))
 import { isBiometricAvailable } from '../src/lib.js'
 
+// the quota tests walk into the player view; stub the iframe like VideoPlayer.test does
+vi.mock('react-youtube', () => ({ default: () => <div data-testid="yt-stub" /> }))
+
 const db = {
   schema_version: 2,
   generated_at: 'x',
@@ -88,5 +91,74 @@ describe('parent gate', () => {
     expect(verify).toHaveBeenCalled()
     expect(screen.queryByText(/Settings/)).toBeNull()
     expect(screen.queryByText(/Grown-ups only/)).toBeNull()
+  })
+})
+
+describe('watch quota gate', () => {
+  const spendQuota = (quotaMins = 15) => {
+    localStorage.setItem('tinytube:settings:v1', JSON.stringify({ quotaMins }))
+    localStorage.setItem(
+      'tinytube:v1',
+      JSON.stringify({ watched: {}, usage: { window: { start: Date.now(), secs: quotaMins * 60 }, days: {}, hours: {} } }),
+    )
+  }
+
+  it('opens the player while under quota', async () => {
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(await screen.findByText(/min remaining/)).toBeTruthy() // player top bar
+  })
+
+  it('blocks the tap with the exceeded screen when the quota is spent', async () => {
+    spendQuota()
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(await screen.findByText(/Watch Quota Exceeded/)).toBeTruthy()
+    expect(screen.queryByText(/min remaining/)).toBeNull() // no player behind it
+  })
+
+  it('always blocks when the quota is 0 (no off state)', async () => {
+    localStorage.setItem('tinytube:settings:v1', JSON.stringify({ quotaMins: 0 }))
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(await screen.findByText(/Watch Quota Exceeded/)).toBeTruthy()
+  })
+
+  it('unblocks by itself once the 12h window has expired', async () => {
+    spendQuota()
+    const stale = JSON.parse(localStorage.getItem('tinytube:v1'))
+    stale.usage.window.start = Date.now() - 13 * 3600_000
+    localStorage.setItem('tinytube:v1', JSON.stringify(stale))
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(await screen.findByText(/min remaining/)).toBeTruthy()
+  })
+
+  it('sends a parent through the biometric into settings', async () => {
+    spendQuota()
+    localStorage.setItem('tinytube:settings:v1', JSON.stringify({ quotaMins: 15, passkeyId: 'abc' }))
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    fireEvent.click(await screen.findByText(/Parents/))
+    expect(await screen.findByText(/Settings/)).toBeTruthy()
+    expect(verify).toHaveBeenCalledWith('abc')
+  })
+
+  it('falls back to the math gate without a passkey', async () => {
+    spendQuota()
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    fireEvent.click(await screen.findByText(/Parents/))
+    expect(await screen.findByText(/Grown-ups only/)).toBeTruthy()
+  })
+
+  it('goes back to the gallery on browser back', async () => {
+    spendQuota()
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    await screen.findByText(/Watch Quota Exceeded/)
+    fireEvent.popState(window)
+    expect(await screen.findByLabelText('Parents')).toBeTruthy()
+    expect(screen.queryByText(/Watch Quota Exceeded/)).toBeNull()
   })
 })

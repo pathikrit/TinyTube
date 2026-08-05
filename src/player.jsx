@@ -3,8 +3,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import YouTube from 'react-youtube'
+import { windowUsed } from './lib.js'
 
-export default function PlayerView({ video, watchStore, onExit }) {
+export default function PlayerView({ video, watchStore, quotaMins, onExit, onQuotaExhausted }) {
   // best-effort landscape: fullscreen + orientation lock works on Android;
   // iOS has neither, so CSS rotates the whole view in portrait (see styles)
   useEffect(() => {
@@ -32,9 +33,21 @@ export default function PlayerView({ video, watchStore, onExit }) {
           <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
           TinyTube
         </span>
+        <span className="ms-auto text-white-50">
+          {/* not fa-utility-duo fa-semibold: the token CSS ships no utility
+              fonts or 600 weight, so the duo layers render as two glyphs */}
+          <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
+          {Math.max(0, Math.ceil((quotaMins * 60 - windowUsed(watchStore.usage)) / 60))} min remaining
+        </span>
       </nav>
       <div className="player-stage position-relative flex-grow-1">
-        <VideoPlayer video={video} watchStore={watchStore} onExit={onExit} />
+        <VideoPlayer
+          video={video}
+          watchStore={watchStore}
+          quotaMins={quotaMins}
+          onExit={onExit}
+          onQuotaExhausted={onQuotaExhausted}
+        />
       </div>
     </div>
   )
@@ -62,7 +75,7 @@ const { ENDED, PLAYING, BUFFERING } = { ENDED: 0, PLAYING: 1, BUFFERING: 3 }
 const RESUME_MIN = 10 // don't bother resuming the first seconds
 const RESUME_TAIL = 20 // ...or into the credits
 
-export function VideoPlayer({ video, watchStore, onExit }) {
+export function VideoPlayer({ video, watchStore, quotaMins, onExit, onQuotaExhausted }) {
   const playerRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState(null)
@@ -70,12 +83,17 @@ export function VideoPlayer({ video, watchStore, onExit }) {
   const [progress, setProgress] = useState({ pos: 0, dur: video.duration ?? 0 })
   const [showControls, setShowControls] = useState(true)
   const hideTimer = useRef(null)
+  const pending = useRef(0) // PLAYING seconds not yet flushed to the quota store
 
   const playing = playerState === PLAYING
   // don't flash the opaque overlay while buffering into playback
   const active = playing || playerState === BUFFERING
 
   const save = useCallback(() => {
+    if (pending.current) {
+      watchStore.addWatchTime(pending.current)
+      pending.current = 0
+    }
     const p = playerRef.current
     if (!p) return
     const pos = Math.floor(p.getCurrentTime() ?? 0)
@@ -90,7 +108,16 @@ export function VideoPlayer({ video, watchStore, onExit }) {
       const p = playerRef.current
       if (!p) return
       setProgress({ pos: p.getCurrentTime() ?? 0, dur: p.getDuration() ?? 0 })
-      if (playing && ++tick % 5 === 0) save()
+      if (!playing) return
+      pending.current++
+      // hard stop the moment the quota runs out — otherwise a video started
+      // with 1 min left plays to the end for free
+      if (windowUsed(watchStore.usage) + pending.current >= quotaMins * 60) {
+        save()
+        onQuotaExhausted()
+      } else if (++tick % 5 === 0) {
+        save()
+      }
     }, 1000)
     const onHide = () => save()
     document.addEventListener('visibilitychange', onHide)
@@ -101,7 +128,7 @@ export function VideoPlayer({ video, watchStore, onExit }) {
       window.removeEventListener('pagehide', onHide)
       save()
     }
-  }, [playing, save])
+  }, [playing, save, watchStore, quotaMins, onQuotaExhausted])
 
   const pokeControls = useCallback(() => {
     setShowControls(true)

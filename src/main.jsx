@@ -1,22 +1,22 @@
-/** App shell: view routing (gallery | player | gate | settings), the parent
- * gate dispatch, and the browser boot. */
+/** App shell: view routing (gallery | player | gate | settings | quota), the
+ * parent gate dispatch, and the browser boot. */
 
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles.css'
-import { useSettings, useVideos, useWatchStore, verify, isBiometricAvailable } from './lib.js'
+import { useSettings, useVideos, useWatchStore, verify, isBiometricAvailable, windowUsed } from './lib.js'
 import Gallery from './gallery.jsx'
 import PlayerView from './player.jsx'
 import Settings from './settings.jsx'
-import { EnrollGate, MathGate } from './landing.jsx'
+import { EnrollGate, MathGate, QuotaGate } from './landing.jsx'
 
 export default function App() {
   const store = useSettings()
   const { db, channels, error } = useVideos(store.settings)
   const watchStore = useWatchStore()
   const [current, setCurrent] = useState(null) // video being played, or null
-  const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'settings'
+  const [view, setView] = useState('gallery') // 'gallery' | 'gate' | 'settings' | 'quota'
   const [biometric, setBiometric] = useState(null) // null = still checking
 
   useEffect(() => {
@@ -65,7 +65,20 @@ export default function App() {
   }
 
   if (current) {
-    return <PlayerView video={current} watchStore={watchStore} onExit={close} />
+    return (
+      <PlayerView
+        video={current}
+        watchStore={watchStore}
+        quotaMins={store.settings.quotaMins}
+        onExit={close}
+        onQuotaExhausted={() => {
+          // same history depth: the player's entry becomes the quota screen's,
+          // so back still lands on the gallery
+          setCurrent(null)
+          setView('quota')
+        }}
+      />
+    )
   }
 
   if (view === 'gate') {
@@ -78,24 +91,45 @@ export default function App() {
   }
 
   if (view === 'settings') {
-    return <Settings db={db} store={store} onDone={close} />
+    return <Settings db={db} store={store} watchStore={watchStore} onDone={close} />
   }
 
   // enrolled device -> OS biometric prompt (called inside the tap handler to
-  // keep iOS user activation); otherwise the math gate bootstraps enrollment
+  // keep iOS user activation); otherwise the math gate bootstraps enrollment.
+  // Returns the view to show, or null (biometric cancelled/failed).
+  const parentGate = async () => {
+    if (store.settings.passkeyId) return (await verify(store.settings.passkeyId)) ? 'settings' : null
+    return 'gate'
+  }
+
+  if (view === 'quota') {
+    return (
+      <QuotaGate
+        onParents={async () => {
+          const v = await parentGate()
+          if (v) setView(v) // same history depth, like MathGate onPass
+        }}
+        onBack={close}
+      />
+    )
+  }
+
   const onParents = async () => {
-    if (store.settings.passkeyId) {
-      if (await verify(store.settings.passkeyId)) open(() => setView('settings'))()
-    } else {
-      open(() => setView('gate'))()
-    }
+    const v = await parentGate()
+    if (v) open(() => setView(v))()
   }
 
   return (
     <Gallery
       channels={channels}
       watchStore={watchStore}
-      onPlay={open(setCurrent)}
+      onPlay={video => {
+        // checked at tap time, not render time: a 12h window that expires while
+        // the gallery sits idle must unblock immediately (expiry is lazy)
+        const over = windowUsed(watchStore.usage) >= store.settings.quotaMins * 60
+        if (over) open(() => setView('quota'))()
+        else open(setCurrent)(video)
+      }}
       onParents={onParents}
     />
   )

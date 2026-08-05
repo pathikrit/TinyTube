@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
-import { curatedChannels, overlaps, storeApi } from './lib.js'
+import { curatedChannels, overlaps, storeApi, fmtMins, usageStats, windowUsed } from './lib.js'
 import { searchChannels, resolveChannel, evictChannelCache, formatCount, validateApiKey } from './youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
 const channelUrl = ch => ch.source_url ?? `https://www.youtube.com/channel/${ch.channel_id}`
 
-export default function Settings({ db, store, onDone }) {
+export default function Settings({ db, store, watchStore, onDone }) {
   // edits accumulate in an in-memory draft; localStorage is only touched by
   // Save, which appears once the draft diverges (back/edge-swipe discards)
   const [settings, setSettings] = useState(store.settings)
@@ -39,6 +39,7 @@ export default function Settings({ db, store, onDone }) {
       </div>
 
       <AgeRow value={settings.ageRange} onChange={draft.setAgeRange} />
+      <QuotaRow value={settings.quotaMins} onChange={draft.setQuotaMins} watchStore={watchStore} />
       <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
       <SearchRow apiKey={settings.apiKey} store={draft} />
       <ChannelTable db={db} store={draft} />
@@ -124,6 +125,66 @@ function AgeRow({ value, onChange }) {
         Age
       </span>
       <DualAgeSlider value={value} onChange={onChange} />
+    </div>
+  )
+}
+
+const QUOTA_MAX_MINS = 240 // 4h, in 15-min steps
+const fmtClock = mins => (mins ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}` : '0')
+
+/** Single-thumb sibling of DualAgeSlider on the same track CSS; the fill span
+ * shows time already used on the shared 0-4h scale. */
+function QuotaSlider({ value, usedMins, onChange }) {
+  const pos = v => `calc(${v / QUOTA_MAX_MINS} * (100% - 32px) + 16px)`
+  return (
+    <div className="dual-slider quota-slider flex-grow-1">
+      {usedMins > 0 && <span className="track-fill" style={{ width: pos(Math.min(usedMins, QUOTA_MAX_MINS)) }} />}
+      <input
+        type="range"
+        min="0"
+        max={QUOTA_MAX_MINS}
+        step="15"
+        value={value}
+        aria-label="Watch quota"
+        onChange={e => onChange(+e.target.value)}
+      />
+      <span className="thumb-label" style={{ left: pos(value) }}>{fmtClock(value)}</span>
+    </div>
+  )
+}
+
+// no reset button: dragging the quota above what's used grants time, and the
+// 12h window expiry clears usage on its own
+function QuotaRow({ value, onChange, watchStore }) {
+  const stats = usageStats(watchStore.usage)
+  const cols = [
+    ['Session', stats.session],
+    ['24Hr', stats.last24h],
+    ['WTD', stats.wtd],
+    ['MTD', stats.mtd],
+    ['YTD', stats.ytd],
+  ]
+  return (
+    <div className="d-flex align-items-center gap-3 mb-3">
+      <span className="text-secondary text-nowrap">
+        <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
+        Quota
+      </span>
+      <QuotaSlider value={value} usedMins={windowUsed(watchStore.usage) / 60} onChange={onChange} />
+      <table className="table table-dark table-borderless table-sm w-auto small text-nowrap m-0">
+        <tbody>
+          <tr className="text-secondary">
+            {cols.map(([label]) => (
+              <td key={label} className="py-0 px-2 text-center">{label}</td>
+            ))}
+          </tr>
+          <tr>
+            {cols.map(([label, secs]) => (
+              <td key={label} className="py-0 px-2 text-center">{fmtMins(Math.round(secs / 60))}</td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }
