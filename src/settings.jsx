@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
-import { curatedChannels, overlaps, storeApi, fmtMins, usageStats, windowUsed } from './lib.js'
+import { curatedChannels, overlaps, storeApi, fmtMins, usageStats, windowUsed, QUOTA_WINDOW_MS } from './lib.js'
 import { searchChannels, resolveChannel, evictChannelCache, formatCount, validateApiKey } from './youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
@@ -119,8 +119,11 @@ function DualAgeSlider({ value: [lo, hi], onChange }) {
 
 function AgeRow({ value, onChange }) {
   return (
-    <div className="d-flex align-items-center gap-3 mb-3">
-      <span className="text-secondary text-nowrap">
+    <div className="d-flex align-items-center gap-3 mb-4">
+      <span
+        className="text-secondary text-nowrap"
+        title="Set your child's age range — only enabled channels overlapping this range are shown"
+      >
         <i className="fa-duotone fa-solid fa-children me-2" />
         Age
       </span>
@@ -159,17 +162,20 @@ function QuotaSlider({ value, usedMins, onChange }) {
 function QuotaRow({ value, onChange, watchStore }) {
   const stats = usageStats(watchStore.usage)
   const cols = [
-    ['Session', stats.session],
-    ['24Hr', stats.last24h],
-    ['WTD', stats.wtd],
-    ['MTD', stats.mtd],
-    ['YTD', stats.ytd],
+    ['Session', stats.session, `Watched in the current ${QUOTA_WINDOW_MS / 3600_000}h quota window`],
+    ['24Hr', stats.last24h, 'Watched in the last 24 hours'],
+    ['WTD', stats.wtd, 'Week to date (since Sunday)'],
+    ['MTD', stats.mtd, 'Month to date'],
+    ['YTD', stats.ytd, 'Year to date'],
   ]
   return (
     // flex-wrap + the slider's min-width: stats sit inline on wide screens
     // and wrap below the slider on phones instead of crushing it
-    <div className="d-flex align-items-center gap-3 flex-wrap mb-3">
-      <span className="text-secondary text-nowrap">
+    <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
+      <span
+        className="text-secondary text-nowrap"
+        title={`Set the viewing limit (resets every ${QUOTA_WINDOW_MS / 3600_000} hrs)`}
+      >
         <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
         Quota
       </span>
@@ -177,13 +183,13 @@ function QuotaRow({ value, onChange, watchStore }) {
       <table className="table table-dark table-borderless table-sm w-auto small text-nowrap m-0">
         <tbody>
           <tr className="text-secondary">
-            {cols.map(([label]) => (
-              <td key={label} className="py-0 px-2 text-center">{label}</td>
+            {cols.map(([label, , hover]) => (
+              <td key={label} className="py-0 px-2 text-center" title={hover}>{label}</td>
             ))}
           </tr>
           <tr>
-            {cols.map(([label, secs]) => (
-              <td key={label} className="py-0 px-2 text-center">{fmtMins(Math.round(secs / 60))}</td>
+            {cols.map(([label, secs, hover]) => (
+              <td key={label} className="py-0 px-2 text-center" title={hover}>{fmtMins(Math.round(secs / 60))}</td>
             ))}
           </tr>
         </tbody>
@@ -208,9 +214,12 @@ function ApiKeyRow({ apiKey, onChange }) {
   }
 
   return (
-    <div className="mb-3">
+    <div className="mb-4">
       <div className="d-flex align-items-center gap-3">
-        <span className="text-secondary text-nowrap">
+        <span
+          className="text-secondary text-nowrap"
+          title="Required only for adding new channels"
+        >
           <i className="fa-sharp-duotone fa-regular fa-key me-2" />
           <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>
         </span>
@@ -325,7 +334,7 @@ function SearchRow({ apiKey, store }) {
   }, [query, apiKey])
 
   return (
-    <div className="mb-3">
+    <div className="mb-4">
       <div className="d-flex align-items-center gap-3">
         <span className="text-secondary text-nowrap">
           <i className="fa-brands fa-youtube me-2" />
