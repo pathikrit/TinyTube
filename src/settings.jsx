@@ -133,9 +133,10 @@ const QUOTA_MAX_MINS = 240 // 4h, in 15-min steps
 const fmtClock = mins => (mins ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}` : '0')
 
 /** Single-thumb sibling of DualAgeSlider on the same track CSS; the fill span
- * shows time already used on the shared 0-4h scale. */
+ * shows time already used on the shared 0-4h scale. The thumb is 44px (not the
+ * age slider's 32px) so the h:mm label inside it stays readable. */
 function QuotaSlider({ value, usedMins, onChange }) {
-  const pos = v => `calc(${v / QUOTA_MAX_MINS} * (100% - 32px) + 16px)`
+  const pos = v => `calc(${v / QUOTA_MAX_MINS} * (100% - 44px) + 22px)`
   return (
     <div className="dual-slider quota-slider flex-grow-1">
       {usedMins > 0 && <span className="track-fill" style={{ width: pos(Math.min(usedMins, QUOTA_MAX_MINS)) }} />}
@@ -165,7 +166,9 @@ function QuotaRow({ value, onChange, watchStore }) {
     ['YTD', stats.ytd],
   ]
   return (
-    <div className="d-flex align-items-center gap-3 mb-3">
+    // flex-wrap + the slider's min-width: stats sit inline on wide screens
+    // and wrap below the slider on phones instead of crushing it
+    <div className="d-flex align-items-center gap-3 flex-wrap mb-3">
       <span className="text-secondary text-nowrap">
         <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
         Quota
