@@ -1,6 +1,5 @@
 node_modules/
 dist/
-webapp/public/videos.json
-__pycache__/
-.venv/
+public/videos.json
+.env
 .DS_Store

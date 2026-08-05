@@ -1,20 +1,20 @@
 .PHONY: download dev test prod
 
-VIDEOS := webapp/public/videos.json
+VIDEOS := public/videos.json
 
-download: ## scrape approved channels -> webapp/public/videos.json
-	uv run --project scraper scraper/scrape.py --channels channels.json --out $(VIDEOS) --max-videos 50 $(SCRAPE_FLAGS)
+download: ## fetch approved channels via YouTube Data API -> public/videos.json
+	npm run download -- $(DOWNLOAD_FLAGS)
 
 $(VIDEOS):
 	$(MAKE) download
 
 dev: $(VIDEOS) ## watch mode: vite dev server (http://localhost:5173) + vitest re-running on change
-	cd webapp && npm install && npm run dev
+	npm install && npm run dev
 
 test: ## test suite; also called in CI
-	cd webapp && npm install && npm run test
+	npm install && npm run test
 
 prod: download ## used by gh-actions: package site for pathikrit.github.io/TinyTube
-	cd webapp && npm ci
+	npm ci
 	$(MAKE) test
-	cd webapp && npm run build
+	npm run build

@@ -1,6 +1,0 @@
-[project]
-name = "tinytube-scraper"
-version = "0.1.0"
-description = "Scrapes approved YouTube channels into videos.json for the TinyTube webapp"
-requires-python = ">=3.12"
-dependencies = ["yt-dlp>=2025.1.1"]

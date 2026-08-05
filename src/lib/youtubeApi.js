@@ -25,6 +25,26 @@ function channelFromSnippet(id, snippet) {
   }
 }
 
+/** topicCategories are Wikipedia URLs, e.g. .../wiki/Children%27s_music -> "Children's music" */
+function topicNames(topicDetails) {
+  const names = (topicDetails?.topicCategories ?? []).map(url =>
+    decodeURIComponent(url.split('/').pop()).replace(/_/g, ' '),
+  )
+  return [...new Set(names)]
+}
+
+/** Full channels.list item -> channel blob with the kid-relevant extras and stats. */
+function channelFromItem(item) {
+  return {
+    ...channelFromSnippet(item.id, item.snippet),
+    made_for_kids: item.status?.madeForKids ?? null, // COPPA designation; null = unknown
+    topics: topicNames(item.topicDetails),
+    subscribers: Number(item.statistics?.subscriberCount) || null,
+    video_count: Number(item.statistics?.videoCount) || null,
+    view_count: Number(item.statistics?.viewCount) || null,
+  }
+}
+
 /**
  * Free-text channel search with preview stats. search.list costs 100 quota
  * units per call — callers must debounce (the 10k/day default quota affords
@@ -37,24 +57,22 @@ export async function searchChannels(apiKey, query) {
   if (!results.length) return results
   try {
     const details = await get('channels', {
-      part: 'snippet,statistics',
+      part: 'snippet,statistics,status,topicDetails',
       id: results.map(r => r.channel_id).join(','),
       key: apiKey,
     })
     const byId = Object.fromEntries((details.items ?? []).map(it => [it.id, it]))
     return results.map(r => {
       const d = byId[r.channel_id]
-      return d
-        ? { ...channelFromSnippet(d.id, d.snippet), subscribers: Number(d.statistics?.subscriberCount) || null }
-        : r
+      return d ? channelFromItem(d) : r
     })
   } catch {
     return results // preview enrichment is best-effort
   }
 }
 
-export function formatSubscribers(n) {
-  return n ? `${Intl.NumberFormat('en', { notation: 'compact' }).format(n)} subscribers` : ''
+export function formatCount(n) {
+  return n ? Intl.NumberFormat('en', { notation: 'compact' }).format(n) : ''
 }
 
 /** Resolve a pasted UC id, channel URL, or @handle (bare or in a URL) to a channel. 1 unit. */
@@ -62,14 +80,14 @@ export async function resolveChannel(apiKey, input) {
   const text = input.trim()
   const id = text.match(UC_ID)?.[0]
   const handle = text.match(/@[\w.-]+/)?.[0]
-  const params = { part: 'snippet', key: apiKey }
+  const params = { part: 'snippet,statistics,status,topicDetails', key: apiKey }
   if (id) params.id = id
   else if (handle) params.forHandle = handle
   else throw new Error('Paste a channel URL, @handle, or UC… id')
   const body = await get('channels', params)
   const item = (body.items ?? [])[0]
   if (!item) throw new Error('Channel not found')
-  return channelFromSnippet(item.id, item.snippet)
+  return channelFromItem(item)
 }
 
 /** PT1H2M3S -> seconds; null when unparsable (e.g. P0D live placeholders). */

@@ -62,7 +62,32 @@ describe('resolveChannel', () => {
     } })
     vi.stubGlobal('fetch', fetch)
     const ch = await resolveChannel('KEY', input)
-    expect(ch).toEqual({ channel_id: UC, channel_title: 'Chan', thumbnail: 't.jpg' })
+    expect(ch).toEqual({
+      channel_id: UC,
+      channel_title: 'Chan',
+      thumbnail: 't.jpg',
+      made_for_kids: null,
+      topics: [],
+      subscribers: null,
+      video_count: null,
+      view_count: null,
+    })
+  })
+
+  it('surfaces the made-for-kids flag and topic categories', async () => {
+    vi.stubGlobal('fetch', mockFetch({ channels: { items: [{
+      id: UC,
+      snippet,
+      status: { madeForKids: true },
+      topicDetails: { topicCategories: [
+        'https://en.wikipedia.org/wiki/Children%27s_music',
+        'https://en.wikipedia.org/wiki/Education',
+        'https://en.wikipedia.org/wiki/Education', // API repeats parents; deduped
+      ] },
+    }] } }))
+    const ch = await resolveChannel('KEY', UC)
+    expect(ch.made_for_kids).toBe(true)
+    expect(ch.topics).toEqual(["Children's music", 'Education'])
   })
 
   it('rejects unparsable input without a network call', async () => {
@@ -85,13 +110,22 @@ describe('searchChannels', () => {
         items: [{
           id: UC,
           snippet: { title: 'Blippi', thumbnails: { medium: { url: 'avatar.jpg' } } },
-          statistics: { subscriberCount: '1000000' },
+          statistics: { subscriberCount: '1000000', videoCount: '850', viewCount: '2500000000' },
         }],
       },
     }))
     const results = await searchChannels('KEY', 'blippi')
     expect(results).toEqual([
-      { channel_id: UC, channel_title: 'Blippi', thumbnail: 'avatar.jpg', subscribers: 1000000 },
+      {
+        channel_id: UC,
+        channel_title: 'Blippi',
+        thumbnail: 'avatar.jpg',
+        subscribers: 1000000,
+        video_count: 850,
+        view_count: 2500000000,
+        made_for_kids: null,
+        topics: [],
+      },
     ])
   })
 

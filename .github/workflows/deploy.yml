@@ -21,22 +21,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: webapp/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Seed with currently deployed data (stale fallback for broken channels)
         run: curl -fsSL "https://pathikrit.github.io/TinyTube/videos.json" -o /tmp/seed.json || true
       - name: Build
-        run: make prod SCRAPE_FLAGS="--seed /tmp/seed.json"
+        run: make prod DOWNLOAD_FLAGS="--seed /tmp/seed.json"
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: webapp/dist
+          path: dist
 
   deploy:
     needs: build

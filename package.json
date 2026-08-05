@@ -1,9 +1,10 @@
 {
-  "name": "tinytube-webapp",
+  "name": "tinytube",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "download": "node --env-file-if-exists=.env download.mjs",
     "dev": "concurrently -k -n vite,test -c cyan,magenta \"vite --host\" \"vitest --watch\"",
     "build": "vite build",
     "preview": "vite preview",

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
 import { curatedChannels, overlaps } from '../lib/channels.js'
 import { storeApi } from '../hooks/useSettings.js'
-import { searchChannels, resolveChannel, evictChannelCache, formatSubscribers } from '../lib/youtubeApi.js'
+import { searchChannels, resolveChannel, evictChannelCache, formatCount } from '../lib/youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
@@ -251,7 +251,10 @@ function SearchRow({ apiKey, store }) {
         <div key={ch.channel_id} className="d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2">
           <img src={ch.thumbnail} alt="" width="36" height="36" className="rounded-circle" />
           <span className="fw-semibold text-truncate">{ch.channel_title}</span>
-          <span className="me-auto text-secondary small text-nowrap">{formatSubscribers(ch.subscribers)}</span>
+          <TopicBadges ch={ch} />
+          <div className="ms-auto">
+            <StatsCell ch={ch} />
+          </div>
           <button
             type="button"
             className="btn btn-danger btn-sm"
@@ -263,6 +266,43 @@ function SearchRow({ apiKey, store }) {
             <i className="fa-sharp-duotone fa-regular fa-plus me-1" />
             Add
           </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// the API's canonical topicCategories plus the COPPA made-for-kids flag
+function TopicBadges({ ch }) {
+  const labels = ch.topics ?? []
+  if (!labels.length && !ch.made_for_kids) return null
+  return (
+    <div className="d-flex flex-wrap gap-1" title={labels.join(', ')}>
+      {ch.made_for_kids && (
+        <span className="badge text-bg-success fw-normal">
+          <i className="fa-duotone fa-solid fa-child me-1" />
+          made for kids
+        </span>
+      )}
+      {labels.slice(0, 3).map(t => (
+        <span key={t} className="badge text-bg-secondary fw-normal">{t}</span>
+      ))}
+    </div>
+  )
+}
+
+function StatsCell({ ch }) {
+  const stats = [
+    [ch.subscribers, 'fa-users', 'subscribers'],
+    [ch.video_count, 'fa-clapperboard', 'videos'],
+    [ch.view_count, 'fa-eye', 'views'],
+  ].filter(([n]) => n)
+  return (
+    <div className="text-secondary small text-nowrap">
+      {stats.map(([n, icon, label]) => (
+        <div key={label} title={`${n.toLocaleString('en')} ${label}`}>
+          <i className={`fa-sharp-duotone fa-regular ${icon} me-1`} />
+          {formatCount(n)} {label}
         </div>
       ))}
     </div>
@@ -317,6 +357,16 @@ function ChannelTable({ db, store }) {
             </a>
           )
         },
+      },
+      {
+        header: 'Stats',
+        id: 'stats',
+        cell: ({ row }) => <StatsCell ch={row.original} />,
+      },
+      {
+        header: 'Topics',
+        id: 'topics',
+        cell: ({ row }) => <TopicBadges ch={row.original} />,
       },
       {
         header: 'Age',
