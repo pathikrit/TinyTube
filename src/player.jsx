@@ -1,8 +1,44 @@
+/** Everything video: the fullscreen player view, the kid-proofed YouTube
+ * embed, and its overlays/controls. */
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import YouTube from 'react-youtube'
-import TouchShield from './TouchShield.jsx'
-import ControlsBar from './ControlsBar.jsx'
-import PausedOverlay from './PausedOverlay.jsx'
+
+export default function PlayerView({ video, watchStore, onExit }) {
+  // best-effort landscape: fullscreen + orientation lock works on Android;
+  // iOS has neither, so CSS rotates the whole view in portrait (see styles)
+  useEffect(() => {
+    ;(async () => {
+      try {
+        await document.documentElement.requestFullscreen?.()
+        await screen.orientation?.lock?.('landscape')
+      } catch {
+        /* unsupported (iOS Safari) — the portrait CSS rotation covers it */
+      }
+    })()
+    return () => {
+      screen.orientation?.unlock?.()
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  return (
+    <div className="player-view d-flex flex-column">
+      <nav className="player-topbar d-flex align-items-center gap-3 px-2">
+        <button type="button" className="btn btn-ctl btn-ctl-sm" aria-label="Back" onClick={onExit}>
+          <i className="fa-sharp-duotone fa-regular fa-arrow-left" />
+        </button>
+        <span className="fs-5 fw-bold">
+          <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
+          TinyTube
+        </span>
+      </nav>
+      <div className="player-stage position-relative flex-grow-1">
+        <VideoPlayer video={video} watchStore={watchStore} onExit={onExit} />
+      </div>
+    </div>
+  )
+}
 
 const OPTS = {
   // NOT youtube-nocookie.com: its privacy mode misfires as "error 150,
@@ -26,7 +62,7 @@ const { ENDED, PLAYING, BUFFERING } = { ENDED: 0, PLAYING: 1, BUFFERING: 3 }
 const RESUME_MIN = 10 // don't bother resuming the first seconds
 const RESUME_TAIL = 20 // ...or into the credits
 
-export default function VideoPlayer({ video, watchStore, onExit }) {
+export function VideoPlayer({ video, watchStore, onExit }) {
   const playerRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState(null)
@@ -138,6 +174,66 @@ export default function VideoPlayer({ video, watchStore, onExit }) {
       {(showControls || (ready && !active)) && (
         <ControlsBar playing={playing} progress={progress} onTogglePlay={togglePlay} onSeek={seekBy} />
       )}
+    </div>
+  )
+}
+
+/**
+ * Transparent layer over the whole iframe: every touch lands here instead of
+ * on YouTube's UI. A tap only toggles our own controls.
+ */
+function TouchShield({ onTap }) {
+  return <div className="touch-shield" onPointerUp={onTap} />
+}
+
+function fmt(seconds) {
+  const s = Math.floor(seconds ?? 0)
+  const m = Math.floor(s / 60)
+  return `${m}:${String(s % 60).padStart(2, '0')}`
+}
+
+function ControlsBar({ playing, progress, onTogglePlay, onSeek }) {
+  const pct = progress.dur > 0 ? (progress.pos / progress.dur) * 100 : 0
+  return (
+    <div className="controls-bar d-flex flex-column gap-2 p-3">
+      <div className="progress" style={{ height: 6 }}>
+        <div className="progress-bar bg-danger" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="d-flex align-items-center gap-3">
+        <span className="text-white-50 small">{fmt(progress.pos)} / {fmt(progress.dur)}</span>
+        <div className="ms-auto d-flex gap-3">
+          <button type="button" className="btn btn-ctl" onClick={() => onSeek(-10)} aria-label="Back 10 seconds">
+            <i className="fa-sharp-duotone fa-regular fa-rotate-left" />
+          </button>
+          <button type="button" className="btn btn-ctl" onClick={onTogglePlay} aria-label="Play or pause">
+            <i className={`fa-sharp-duotone fa-regular ${playing ? 'fa-pause' : 'fa-play'}`} />
+          </button>
+          <button type="button" className="btn btn-ctl" onClick={() => onSeek(10)} aria-label="Forward 10 seconds">
+            <i className="fa-sharp-duotone fa-regular fa-rotate-right" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Opaque overlay shown whenever the video isn't playing, so YouTube's paused
+ * "More videos" tray and end screen can never be seen or tapped.
+ */
+function PausedOverlay({ video, onPlay, onExit }) {
+  return (
+    <div className="paused-overlay" style={{ backgroundImage: `url(${video.thumbnail})` }}>
+      <div className="paused-overlay-scrim d-flex flex-column align-items-center justify-content-center gap-3 p-4">
+        <button type="button" className="btn btn-play-big" onClick={onPlay} aria-label="Play">
+          <i className="fa-sharp-duotone fa-regular fa-play" />
+        </button>
+        <div className="fs-5 text-center text-truncate w-100">{video.title}</div>
+        <button type="button" className="btn btn-outline-light btn-lg" onClick={onExit}>
+          <i className="fa-sharp-duotone fa-regular fa-grid-2 me-2" />
+          More videos
+        </button>
+      </div>
     </div>
   )
 }

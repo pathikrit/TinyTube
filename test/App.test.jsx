@@ -1,14 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import App from './App.jsx'
-import { verify } from './lib/webauthn.js'
+import App from '../src/main.jsx'
+import { verify } from '../src/lib.js'
 
-vi.mock('./lib/webauthn.js', () => ({
+// partial mock: webauthn now lives in lib.js next to the hooks, which must stay real
+vi.mock('../src/lib.js', async importOriginal => ({
+  ...(await importOriginal()),
   verify: vi.fn(async () => true),
   isBiometricAvailable: vi.fn(async () => false),
   enroll: vi.fn(async () => 'fresh-credential'),
 }))
-import { isBiometricAvailable } from './lib/webauthn.js'
+import { isBiometricAvailable } from '../src/lib.js'
 
 const db = {
   schema_version: 2,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeChallenge } from './mathGate.js'
+import { makeChallenge } from '../src/lib.js'
 
 describe('makeChallenge', () => {
   it('holds the invariants across many random challenges', () => {

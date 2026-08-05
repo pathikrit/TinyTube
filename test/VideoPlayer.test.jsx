@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import VideoPlayer from './VideoPlayer.jsx'
+import { VideoPlayer } from '../src/player.jsx'
 
 // Stub the YouTube iframe: capture the lifecycle callbacks so tests can fire
 // onReady / onStateChange / onError exactly like the real player would.

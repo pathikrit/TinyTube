@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import Gallery from './Gallery.jsx'
+import Gallery from '../src/gallery.jsx'
 
 const channels = [{ channel_title: 'Chan', videos: [{ id: 'v1', title: 'Vid', thumbnail: 't.jpg' }] }]
 const watchStore = { watched: {} }

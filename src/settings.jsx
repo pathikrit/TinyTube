@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
-import { curatedChannels, overlaps } from '../lib/channels.js'
-import { storeApi } from '../hooks/useSettings.js'
-import { searchChannels, resolveChannel, evictChannelCache, formatCount } from '../lib/youtubeApi.js'
+import { curatedChannels, overlaps, storeApi } from './lib.js'
+import { searchChannels, resolveChannel, evictChannelCache, formatCount } from './youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())

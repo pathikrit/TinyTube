@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { overlaps, curatedChannels, mergeChannels } from './channels.js'
-import { DEFAULTS } from '../hooks/useSettings.js'
+import { overlaps, curatedChannels, mergeChannels } from '../src/lib.js'
+import { DEFAULTS } from '../src/lib.js'
 
 // videos.json v2: flat channel list, each with its own age range
 const db = {

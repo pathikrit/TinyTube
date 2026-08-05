@@ -5,7 +5,7 @@ import {
   parseDuration,
   fetchChannelVideos,
   getChannelVideosCached,
-} from './youtubeApi.js'
+} from '../src/youtubeApi.js'
 
 const UC = 'UCoookXUzPciGrEZEXmh4Jjg'
 

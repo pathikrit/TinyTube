@@ -1,9 +1,13 @@
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import MathGate from './MathGate.jsx'
+import { MathGate } from '../src/landing.jsx'
 
 const challenge = { a: 47, b: 78, answer: 125, choices: [115, 125, 126, 124] }
-vi.mock('../lib/mathGate.js', () => ({ makeChallenge: () => challenge }))
+// partial mock: makeChallenge lives in lib.js next to the hooks, which must stay real
+vi.mock('../src/lib.js', async importOriginal => ({
+  ...(await importOriginal()),
+  makeChallenge: () => challenge,
+}))
 
 let onPass, onFail
 beforeEach(() => {

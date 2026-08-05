@@ -13,7 +13,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
-import { resolveChannel, fetchChannelVideos } from './src/lib/youtubeApi.js'
+import { resolveChannel, fetchChannelVideos } from './src/youtubeApi.js'
 
 const { values: args } = parseArgs({
   options: {

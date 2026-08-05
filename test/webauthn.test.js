@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { isBiometricAvailable, enroll, verify, toBase64url, fromBase64url } from './webauthn.js'
+import { isBiometricAvailable, enroll, verify, toBase64url, fromBase64url } from '../src/lib.js'
 
 afterEach(() => vi.unstubAllGlobals())
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { gallerySort, fraction } from './useWatchStore.js'
+import { gallerySort, fraction } from '../src/lib.js'
 
 const channels = [
   { channel_title: 'Busy', videos: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }, { id: 'b4' }] },

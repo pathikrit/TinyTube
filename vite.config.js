@@ -16,5 +16,6 @@ export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? (process.env.BASE_PATH ?? '/TinyTube/') : '/',
   define: { __COMMIT_SHA__: JSON.stringify(commitSha()) },
-  test: { environment: 'jsdom', globals: true }, // globals so testing-library auto-cleans between tests
+  // globals so testing-library auto-cleans between tests
+  test: { include: ['test/**/*.test.{js,jsx}'], environment: 'jsdom', globals: true },
 }))
