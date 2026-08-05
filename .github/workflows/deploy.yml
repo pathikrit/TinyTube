@@ -28,11 +28,16 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Seed with currently deployed data (stale fallback for broken channels)
         run: curl -fsSL "https://pathikrit.github.io/TinyTube/videos.json" -o /tmp/seed.json || true
+      - run: npm ci
+      - name: Download
+        run: npm run download -- --seed /tmp/seed.json
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      - run: npm test
       - name: Build
-        run: make prod DOWNLOAD_FLAGS="--seed /tmp/seed.json"
+        run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
