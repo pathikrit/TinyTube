@@ -80,14 +80,22 @@ export function formatCount(n) {
   return n ? Intl.NumberFormat('en', { notation: 'compact' }).format(n) : ''
 }
 
-/** Resolve a pasted UC id, channel URL, or @handle (bare or in a URL) to a channel. 1 unit. */
+/** Resolve a pasted UC id, channel URL (with or without @), or @handle to a channel. 1 unit. */
 export async function resolveChannel(apiKey, input) {
   const text = input.trim()
   const id = text.match(UC_ID)?.[0]
   const handle = text.match(/@[\w.-]+/)?.[0]
+  // legacy URLs carry no @: /user/Name has its own lookup param, while /c/Name
+  // and bare youtube.com/Name custom URLs nearly always match today's handle
+  const user = text.match(/youtube\.com\/user\/([\w.-]+)/)?.[1]
+  const legacy = text.match(
+    /youtube\.com\/(?:c\/)?(?!(?:watch|shorts|playlist|embed|results|feed|channel|user)\b)([\w.-]+)/,
+  )?.[1]
   const params = { part: 'snippet,statistics,status,topicDetails', key: apiKey }
   if (id) params.id = id
   else if (handle) params.forHandle = handle
+  else if (user) params.forUsername = user
+  else if (legacy) params.forHandle = legacy
   else throw new Error('Paste a channel URL, @handle, or UC… id')
   const body = await get('channels', params)
   const item = (body.items ?? [])[0]

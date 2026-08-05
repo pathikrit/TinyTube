@@ -56,6 +56,9 @@ describe('resolveChannel', () => {
     [UC, 'id', UC],
     ['https://www.youtube.com/@SciShowKids', 'forHandle', '@SciShowKids'],
     ['@SciShowKids', 'forHandle', '@SciShowKids'],
+    ['https://www.youtube.com/c/SciShowKids', 'forHandle', 'SciShowKids'],
+    ['https://www.youtube.com/SciShowKids/videos', 'forHandle', 'SciShowKids'],
+    ['youtube.com/user/scishow', 'forUsername', 'scishow'],
   ])('parses %s', async (input, param, expected) => {
     const fetch = mockFetch({ channels: params => {
       expect(params.get(param)).toBe(expected)
@@ -95,6 +98,9 @@ describe('resolveChannel', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     await expect(resolveChannel('KEY', 'just words')).rejects.toThrow(/Paste a channel/)
+    await expect(resolveChannel('KEY', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')).rejects.toThrow(
+      /Paste a channel/,
+    )
     expect(fetch).not.toHaveBeenCalled()
   })
 })
