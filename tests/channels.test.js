@@ -37,6 +37,22 @@ describe('mergeChannels', () => {
     expect(mergeChannels(db, {}, s).map(c => c.channel_id)).toEqual(['UCa', 'UCc'])
   })
 
+  it('excludes toggled-off channels even when their age range matches', () => {
+    const s = settings({ overrides: { UCb: { disabled: true } } })
+    expect(mergeChannels(db, {}, s).map(c => c.channel_id)).toEqual(['UCa', 'UCc'])
+  })
+
+  it('excludes toggled-off custom channels', () => {
+    const custom = [{ channel_id: 'UCx', channel_title: 'Off', min_age: 1, max_age: 15, disabled: true }]
+    const merged = mergeChannels(db, {}, settings({ customChannels: custom }))
+    expect(merged.find(c => c.channel_id === 'UCx')).toBeUndefined()
+  })
+
+  it('re-enabling via disabled:false restores the channel', () => {
+    const s = settings({ overrides: { UCb: { disabled: false } } })
+    expect(mergeChannels(db, {}, s).map(c => c.channel_id)).toEqual(['UCa', 'UCb', 'UCc'])
+  })
+
   it('applies parent age edits to curated channels', () => {
     const s = settings({ overrides: { UCa: { min_age: 6, max_age: 12 } }, ageRange: [5, 6] })
     // UCa's own range 2-4 wouldn't overlap [5,6], but the edit 6-12 does

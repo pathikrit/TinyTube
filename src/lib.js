@@ -116,18 +116,19 @@ export function curatedChannels(db, overrides = {}) {
 
 /**
  * The gallery's channel list: curated channels (edits applied) that aren't
- * hidden and overlap the age range, plus parent-added channels — shaped
- * exactly like curated ones ({channel_title, videos}) so gallerySort works
- * unchanged. Curated wins if a parent adds an already-curated channel.
+ * hidden or toggled off and overlap the age range, plus parent-added
+ * channels — shaped exactly like curated ones ({channel_title, videos}) so
+ * gallerySort works unchanged. Curated wins if a parent adds an
+ * already-curated channel.
  */
 export function mergeChannels(db, customVideosById, settings) {
   const { ageRange, customChannels, overrides } = settings
   const curated = curatedChannels(db, overrides).filter(
-    ch => !ch.hidden && overlaps(ageRange, ch.min_age, ch.max_age),
+    ch => !ch.hidden && !ch.disabled && overlaps(ageRange, ch.min_age, ch.max_age),
   )
   const curatedIds = new Set((db?.channels ?? []).map(ch => ch.channel_id))
   const custom = customChannels
-    .filter(ch => !curatedIds.has(ch.channel_id) && overlaps(ageRange, ch.min_age, ch.max_age))
+    .filter(ch => !curatedIds.has(ch.channel_id) && !ch.disabled && overlaps(ageRange, ch.min_age, ch.max_age))
     .map(ch => ({ ...ch, videos: customVideosById[ch.channel_id] ?? [] }))
   return [...curated, ...custom]
 }
@@ -141,7 +142,7 @@ export const DEFAULTS = {
   apiKey: '',
   ageRange: [1, 15], // everything
   customChannels: [], // parent-added, same flat shape as channels.json entries: [{channel_id, channel_title, thumbnail, min_age, max_age}]
-  overrides: {}, // per curated channel_id: {min_age?, max_age?, hidden?} edited in the table
+  overrides: {}, // per curated channel_id: {min_age?, max_age?, hidden?, disabled?} edited in the table
   passkeyId: null, // WebAuthn credential id (base64url); when set, the parent gate is biometric-only
 }
 

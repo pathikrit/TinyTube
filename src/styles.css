@@ -147,9 +147,15 @@ html, body, #root {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); /* extra contrast on the red thumb */
 }
 
-/* channel rows outside the global age filter: still editable, visibly inactive */
-tr.out-of-range {
+/* channel rows the kid won't see (outside the age filter, or checkbox off):
+   still editable, visibly inactive — but the enable checkbox in the first
+   cell keeps full strength so the way back stays obvious */
+tr.out-of-range td {
   opacity: 0.35;
+}
+
+tr.out-of-range td:first-child {
+  opacity: 1;
 }
 
 tr.out-of-range img {

@@ -349,14 +349,33 @@ function StatsCell({ ch }) {
   )
 }
 
-function ChannelAgeSlider({ ch, store }) {
-  const save = ch.custom
+// per-channel edits land on the custom channel object itself or in the
+// curated channel's override, depending on where the row came from
+const channelPatcher = (ch, store) =>
+  ch.custom
     ? patch => store.updateCustomChannel(ch.channel_id, patch)
     : patch => store.setOverride(ch.channel_id, patch)
+
+function ChannelAgeSlider({ ch, store }) {
+  const save = channelPatcher(ch, store)
   return (
     <DualAgeSlider
       value={[ch.min_age, ch.max_age]}
       onChange={([min_age, max_age]) => save({ min_age, max_age })}
+    />
+  )
+}
+
+/** Quick on/off without deleting; the age filter still applies independently. */
+function EnabledCheckbox({ ch, store }) {
+  const save = channelPatcher(ch, store)
+  return (
+    <input
+      type="checkbox"
+      className="form-check-input"
+      checked={!ch.disabled}
+      aria-label={`Enable ${ch.channel_title}`}
+      onChange={e => save({ disabled: !e.target.checked })}
     />
   )
 }
@@ -375,10 +394,15 @@ function ChannelTable({ db, store }) {
   )
 
   const { ageRange } = store.settings
-  const inRange = data.filter(ch => overlaps(ageRange, ch.min_age, ch.max_age)).length
+  const inRange = data.filter(ch => !ch.disabled && overlaps(ageRange, ch.min_age, ch.max_age)).length
 
   const columns = useMemo(
     () => [
+      {
+        id: 'enabled',
+        header: '',
+        cell: ({ row }) => <EnabledCheckbox ch={row.original} store={store} />,
+      },
       {
         header: `Channel (${inRange}/${data.length})`,
         accessorKey: 'channel_title',
@@ -468,9 +492,10 @@ function ChannelTable({ db, store }) {
               <tr
                 key={row.id}
                 className={
+                  !row.original.disabled &&
                   overlaps(store.settings.ageRange, row.original.min_age, row.original.max_age)
                     ? undefined
-                    : 'out-of-range' // hidden from the kid by the current age filter
+                    : 'out-of-range' // hidden from the kid: age-filtered or toggled off
                 }
               >
                 {row.getVisibleCells().map(cell => (
