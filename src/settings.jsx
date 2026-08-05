@@ -18,7 +18,7 @@ export default function Settings({ db, store, onDone }) {
     <div className="settings container-xl py-4">
       <div className="d-flex align-items-center mb-4">
         <h1 className="fs-3 fw-bold m-0 me-auto">
-          <i className="fa-sharp-duotone fa-solid fa-remote me-2 text-danger" />
+          <i className="fa-sharp-duotone fa-solid fa-gear me-2 text-danger" />
           Settings
         </h1>
         {dirty && (

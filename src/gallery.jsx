@@ -24,7 +24,7 @@ export default function Gallery({ channels, watchStore, onPlay, onParents }) {
           aria-label="Parents"
           onClick={onParents}
         >
-          <i className="fa-sharp-duotone fa-solid fa-remote text-danger" />
+          <i className="fa-sharp-duotone fa-solid fa-gear text-danger" />
         </button>
       </nav>
       <div className="container-fluid py-3">
