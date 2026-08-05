@@ -71,6 +71,11 @@ export async function searchChannels(apiKey, query) {
   }
 }
 
+/** Key sanity-check via the cheapest keyed endpoint (i18nLanguages, 1 unit). */
+export async function validateApiKey(apiKey) {
+  await get('i18nLanguages', { part: 'snippet', key: apiKey })
+}
+
 export function formatCount(n) {
   return n ? Intl.NumberFormat('en', { notation: 'compact' }).format(n) : ''
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
 import { curatedChannels, overlaps, storeApi } from './lib.js'
-import { searchChannels, resolveChannel, evictChannelCache, formatCount } from './youtubeApi.js'
+import { searchChannels, resolveChannel, evictChannelCache, formatCount, validateApiKey } from './youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
@@ -132,41 +132,82 @@ function AgeRow({ value, onChange }) {
 
 function ApiKeyRow({ apiKey, onChange }) {
   const [confirming, setConfirming] = useState(false)
+  const [check, setCheck] = useState(null) // null | 'busy' | 'ok' | error message
+
+  const validate = async () => {
+    if (!apiKey) return
+    setCheck('busy')
+    try {
+      await validateApiKey(apiKey)
+      setCheck('ok')
+    } catch (err) {
+      setCheck(err.message)
+    }
+  }
+
   return (
-    <div className="d-flex align-items-center gap-3 mb-3">
-      <span className="text-secondary text-nowrap">
-        <i className="fa-sharp-duotone fa-regular fa-key me-2" />
-        <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>
-      </span>
-      {/* real <form> + username/current-password hints so the browser's
-          password manager offers to save the key; Save submits it via
-          form="api-key-form" and preventDefault keeps the SPA in place */}
-      <form
-        id="api-key-form"
-        className="d-flex align-items-center gap-3 flex-grow-1"
-        onSubmit={e => e.preventDefault()}
-      >
-        <input type="text" name="username" value="youtube-api-key" autoComplete="username" readOnly hidden />
-        <input
-          type="password"
-          name="api-key"
-          className="form-control"
-          placeholder="AIza… (needed to add channels)"
-          value={apiKey}
-          onChange={e => onChange(e.target.value)}
-          autoComplete="current-password"
-        />
-      </form>
-      {apiKey && (
-        <button
-          type="button"
-          className="btn btn-outline-danger btn-sm"
-          aria-label="Delete API key"
-          onClick={() => setConfirming(true)}
+    <div className="mb-3">
+      <div className="d-flex align-items-center gap-3">
+        <span className="text-secondary text-nowrap">
+          <i className="fa-sharp-duotone fa-regular fa-key me-2" />
+          <a href={API_CONSOLE_URL} target="_blank" rel="noreferrer">YouTube API Key</a>
+        </span>
+        {/* real <form> + username/current-password hints so the browser's
+            password manager offers to save the key; Save submits it via
+            form="api-key-form" and preventDefault keeps the SPA in place */}
+        <form
+          id="api-key-form"
+          className="d-flex align-items-center gap-3 flex-grow-1"
+          onSubmit={e => e.preventDefault()}
         >
-          <i className="fa-sharp-duotone fa-regular fa-trash" />
-        </button>
-      )}
+          <input type="text" name="username" value="youtube-api-key" autoComplete="username" readOnly hidden />
+          <div className="position-relative flex-grow-1">
+            <input
+              type="password"
+              name="api-key"
+              className="form-control"
+              placeholder="AIza… (needed to add channels)"
+              value={apiKey}
+              onChange={e => {
+                setCheck(null)
+                onChange(e.target.value)
+              }}
+              // Enter validates the key in place; preventDefault stops the
+              // implicit form submission from clicking the Save button
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  validate()
+                }
+              }}
+              autoComplete="current-password"
+            />
+            {check === 'busy' && (
+              <span
+                className="spinner-border spinner-border-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                role="status"
+              />
+            )}
+            {check === 'ok' && (
+              <i
+                className="fa-sharp-duotone fa-regular fa-check text-success position-absolute top-50 end-0 translate-middle-y me-2"
+                aria-label="API key is valid"
+              />
+            )}
+          </div>
+        </form>
+        {apiKey && (
+          <button
+            type="button"
+            className="btn btn-outline-danger btn-sm"
+            aria-label="Delete API key"
+            onClick={() => setConfirming(true)}
+          >
+            <i className="fa-sharp-duotone fa-regular fa-trash" />
+          </button>
+        )}
+      </div>
+      {check && check !== 'busy' && check !== 'ok' && <div className="alert alert-warning mt-2 py-2">{check}</div>}
       {confirming && (
         <ConfirmModal
           title="Delete API key?"

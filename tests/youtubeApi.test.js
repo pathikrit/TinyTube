@@ -5,6 +5,7 @@ import {
   parseDuration,
   fetchChannelVideos,
   getChannelVideosCached,
+  validateApiKey,
 } from '../src/youtubeApi.js'
 
 const UC = 'UCoookXUzPciGrEZEXmh4Jjg'
@@ -136,6 +137,25 @@ describe('searchChannels', () => {
     }))
     const results = await searchChannels('KEY', 'blippi')
     expect(results).toEqual([{ channel_id: UC, channel_title: 'Blippi', thumbnail: undefined }])
+  })
+})
+
+describe('validateApiKey', () => {
+  it('resolves for a working key', async () => {
+    vi.stubGlobal('fetch', mockFetch({ i18nLanguages: params => {
+      expect(params.get('key')).toBe('KEY')
+      return { items: [] }
+    } }))
+    await expect(validateApiKey('KEY')).resolves.toBeUndefined()
+  })
+
+  it('rejects with the API error message for a bad key', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: 'API key not valid. Please pass a valid API key.' } }),
+    })))
+    await expect(validateApiKey('BAD')).rejects.toThrow('API key not valid')
   })
 })
 
