@@ -16,11 +16,12 @@ export default function Settings({ db, store, onDone }) {
 
   return (
     <div className="settings container-xl py-4">
-      <div className="d-flex align-items-center mb-4">
+      <div className="d-flex align-items-center gap-3 mb-4">
         <h1 className="fs-3 fw-bold m-0 me-auto">
           <i className="fa-sharp-duotone fa-solid fa-remote me-2 text-danger" />
           Settings
         </h1>
+        <VersionLink />
         {dirty && (
           <button
             type="submit"
@@ -41,7 +42,6 @@ export default function Settings({ db, store, onDone }) {
       <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
       <SearchRow apiKey={settings.apiKey} store={draft} />
       <ChannelTable db={db} store={draft} />
-      <VersionFooter />
     </div>
   )
 }
@@ -74,21 +74,19 @@ function ConfirmModal({ title, body, onConfirm, onCancel }) {
   )
 }
 
-function VersionFooter() {
+function VersionLink() {
   const sha = typeof __COMMIT_SHA__ !== 'undefined' ? __COMMIT_SHA__ : ''
   if (!sha) return null
   return (
-    <div className="text-center mt-4">
-      <a
-        href={`https://github.com/pathikrit/TinyTube/commit/${sha}`}
-        target="_blank"
-        rel="noreferrer"
-        className="text-secondary small text-decoration-none"
-      >
-        <i className="fa-sharp-duotone fa-regular fa-code-commit me-1" />
-        v{sha.slice(0, 7)}
-      </a>
-    </div>
+    <a
+      href={`https://github.com/pathikrit/TinyTube/commit/${sha}`}
+      target="_blank"
+      rel="noreferrer"
+      className="text-secondary small text-decoration-none"
+    >
+      <i className="fa-sharp-duotone fa-regular fa-code-commit me-1" />
+      v{sha.slice(0, 7)}
+    </a>
   )
 }
 
