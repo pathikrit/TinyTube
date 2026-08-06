@@ -16,26 +16,48 @@ export default function Settings({ db, store, watchStore, onDone }) {
 
   return (
     <div className="settings container-xl py-4">
+      {/* explicit back button: iOS standalone PWAs have no browser chrome or
+          hardware back, so without it a no-change visit would strand you here;
+          like edge-swipe it discards the draft. flex: 1 sides keep the title
+          truly centered */}
       <div className="d-flex align-items-center gap-3 mb-4">
-        <h1 className="fs-3 fw-bold m-0 me-auto">
+        <div style={{ flex: 1 }}>
+          <button type="button" className="btn btn-outline-secondary" aria-label="Back to gallery" onClick={onDone}>
+            <i className="fa-sharp-duotone fa-regular fa-arrow-left" />
+          </button>
+        </div>
+        <h1 className="fs-3 fw-bold m-0">
           <i className="fa-sharp-duotone fa-solid fa-remote me-2 text-danger" />
           Settings
         </h1>
-        <VersionLink />
-        {dirty && (
-          <button
-            type="submit"
-            form="api-key-form"
-            className="btn btn-danger btn-lg"
-            onClick={() => {
-              store.save(settings)
-              onDone()
-            }}
-          >
-            <i className="fa-sharp-duotone fa-regular fa-check me-2" />
-            Save
-          </button>
-        )}
+        <div className="d-flex align-items-center justify-content-end gap-3" style={{ flex: 1 }}>
+          <VersionLink />
+          {dirty && (
+            <>
+              {/* discards the draft but stays on the page, unlike Back */}
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-lg"
+                onClick={() => setSettings(store.settings)}
+              >
+                <i className="fa-sharp-duotone fa-regular fa-arrow-rotate-left me-2" />
+                Revert
+              </button>
+              <button
+                type="submit"
+                form="api-key-form"
+                className="btn btn-danger btn-lg"
+                onClick={() => {
+                  store.save(settings)
+                  onDone()
+                }}
+              >
+                <i className="fa-sharp-duotone fa-regular fa-check me-2" />
+                Save
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <AgeRow value={settings.ageRange} onChange={draft.setAgeRange} />
