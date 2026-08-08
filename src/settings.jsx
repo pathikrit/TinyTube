@@ -259,8 +259,9 @@ function MinLengthRow({ value, onChange }) {
   )
 }
 
-// enough of a stored key to recognize it without exposing the whole thing
-const maskKey = k => `${k.slice(0, 6)}…${k.slice(-4)}`
+// enough of a stored key to recognize it without exposing the whole thing;
+// one dot per hidden character so the preview keeps the key's real length
+const maskKey = k => `${k.slice(0, 6)}${'•'.repeat(k.length - 10)}${k.slice(-4)}`
 
 function ApiKeyRow({ apiKey, onChange }) {
   const [confirming, setConfirming] = useState(false)
