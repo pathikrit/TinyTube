@@ -451,15 +451,13 @@ function SearchRow({ apiKey, store, db }) {
       </div>
       {error && <div className="alert alert-warning mt-2 py-2">{error}</div>}
       {results.map(ch => {
-        // custom or curated: re-adding either is a no-op (curated wins on merge)
-        const added =
-          store.settings.customChannels.some(c => c.channel_id === ch.channel_id) ||
-          (db?.channels ?? []).some(c => c.channel_id === ch.channel_id)
+        const isCustom = store.settings.customChannels.some(c => c.channel_id === ch.channel_id)
+        const isCurated = (db?.channels ?? []).some(c => c.channel_id === ch.channel_id)
+        // a deleted (hidden) curated channel counts as not added: Add un-hides
+        // it, since adding it as custom would be a no-op (curated wins on merge)
+        const added = isCustom || (isCurated && !store.settings.overrides[ch.channel_id]?.hidden)
         return (
-          <div
-            key={ch.channel_id}
-            className={`d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2${added ? ' opacity-50' : ''}`}
-          >
+          <div key={ch.channel_id} className="d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2">
             <img src={ch.thumbnail} alt="" width="36" height="36" className="rounded-circle" />
             <span className="fw-semibold text-truncate">{ch.channel_title}</span>
             <TopicBadges ch={ch} />
@@ -467,16 +465,29 @@ function SearchRow({ apiKey, store, db }) {
               <StatsCell ch={ch} />
             </div>
             {added ? (
-              <span className="text-secondary text-nowrap small">
-                <i className="fa-sharp-duotone fa-regular fa-check me-1" />
-                Already added
-              </span>
+              // same semantics as the table's delete: drop custom, hide curated
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => {
+                  if (isCustom) {
+                    store.removeCustomChannel(ch.channel_id)
+                    evictChannelCache(ch.channel_id)
+                  } else {
+                    store.setOverride(ch.channel_id, { hidden: true })
+                  }
+                }}
+              >
+                <i className="fa-sharp-duotone fa-regular fa-trash me-1" />
+                Remove
+              </button>
             ) : (
               <button
                 type="button"
                 className="btn btn-danger btn-sm"
                 onClick={() => {
-                  store.addCustomChannel({ ...ch, min_age: 1, max_age: 15 })
+                  if (isCurated) store.setOverride(ch.channel_id, { hidden: false })
+                  else store.addCustomChannel({ ...ch, min_age: 1, max_age: 15 })
                   setQuery('')
                 }}
               >
