@@ -106,7 +106,7 @@ describe('watch quota gate', () => {
   it('opens the player while under quota', async () => {
     render(<App />)
     fireEvent.click(await screen.findByText('Vid'))
-    expect(await screen.findByText(/min remaining/)).toBeTruthy() // player top bar
+    expect(await screen.findByTitle('Watch time left')).toBeTruthy() // player top bar quota meter
   })
 
   it('blocks the tap with the exceeded screen when the quota is spent', async () => {
@@ -114,7 +114,7 @@ describe('watch quota gate', () => {
     render(<App />)
     fireEvent.click(await screen.findByText('Vid'))
     expect(await screen.findByText(/Watch Quota Exceeded/)).toBeTruthy()
-    expect(screen.queryByText(/min remaining/)).toBeNull() // no player behind it
+    expect(screen.queryByTitle('Watch time left')).toBeNull() // no player behind it
   })
 
   it('always blocks when the quota is 0 (no off state)', async () => {
@@ -131,7 +131,7 @@ describe('watch quota gate', () => {
     localStorage.setItem('tinytube:v1', JSON.stringify(stale))
     render(<App />)
     fireEvent.click(await screen.findByText('Vid'))
-    expect(await screen.findByText(/min remaining/)).toBeTruthy()
+    expect(await screen.findByTitle('Watch time left')).toBeTruthy()
   })
 
   it('sends a parent through the biometric into settings', async () => {

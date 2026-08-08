@@ -3,9 +3,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import YouTube from 'react-youtube'
-import { windowUsed } from './lib.js'
+import { fmtMins, windowUsed } from './lib.js'
 
 export default function PlayerView({ video, watchStore, quotaMins, onExit, onQuotaExhausted }) {
+  const quotaSecs = quotaMins * 60
+  const secsLeft = Math.max(0, quotaSecs - windowUsed(watchStore.usage))
+  const pctLeft = quotaSecs ? (secsLeft / quotaSecs) * 100 : 0
+
   // best-effort landscape: fullscreen + orientation lock works on Android;
   // iOS has neither, so CSS rotates the whole view in portrait (see styles)
   useEffect(() => {
@@ -33,11 +37,18 @@ export default function PlayerView({ video, watchStore, quotaMins, onExit, onQuo
           <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
           TinyTube
         </span>
-        <span className="ms-auto text-white-50">
+        <span className="ms-auto d-flex align-items-center gap-2 text-white-50">
           {/* not fa-utility-duo fa-semibold: the token CSS ships no utility
               fonts or 600 weight, so the duo layers render as two glyphs */}
-          <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
-          {Math.max(0, Math.ceil((quotaMins * 60 - windowUsed(watchStore.usage)) / 60))} min remaining
+          <i className="fa-sharp-duotone fa-regular fa-stopwatch" />
+          {/* drains as quota is spent; recolors so it reads without the number */}
+          <div className="progress" style={{ width: 100, height: 8 }} title="Watch time left">
+            <div
+              className={`progress-bar ${pctLeft > 50 ? 'bg-success' : pctLeft > 20 ? 'bg-warning' : 'bg-danger'}`}
+              style={{ width: `${pctLeft}%` }}
+            />
+          </div>
+          {fmtMins(Math.ceil(secsLeft / 60))}
         </span>
       </nav>
       <div className="player-stage position-relative flex-grow-1">

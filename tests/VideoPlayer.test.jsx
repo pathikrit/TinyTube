@@ -206,15 +206,26 @@ describe('watch quota', () => {
 })
 
 describe('top bar countdown', () => {
-  it('shows the minutes remaining against the quota', () => {
+  const quotaBar = () => document.querySelector('.player-topbar .progress-bar')
+
+  it('shows a full green bar on a fresh quota', () => {
+    renderPlayer(PlayerView)
+    expect(screen.getByText('1h')).toBeTruthy() // default 60min quota
+    expect(quotaBar().className).toContain('bg-success')
+    expect(quotaBar().style.width).toBe('100%')
+  })
+
+  it('drains and turns red as the quota runs out', () => {
     watchStore.usage.window = { start: Date.now(), secs: 3570 }
     renderPlayer(PlayerView)
-    expect(screen.getByText(/1 min remaining/)).toBeTruthy()
+    expect(screen.getByText('1m')).toBeTruthy()
+    expect(quotaBar().className).toContain('bg-danger')
   })
 
   it('never goes negative', () => {
     watchStore.usage.window = { start: Date.now(), secs: 9999 }
     renderPlayer(PlayerView)
-    expect(screen.getByText(/0 min remaining/)).toBeTruthy()
+    expect(screen.getByText('0m')).toBeTruthy()
+    expect(quotaBar().style.width).toBe('0%')
   })
 })
