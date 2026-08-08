@@ -64,7 +64,7 @@ export default function Settings({ db, store, watchStore, onDone }) {
       <QuotaRow value={settings.quotaMins} onChange={draft.setQuotaMins} watchStore={watchStore} />
       <MinLengthRow value={settings.minVideoMins} onChange={draft.setMinVideoMins} />
       <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
-      <SearchRow apiKey={settings.apiKey} store={draft} />
+      <SearchRow apiKey={settings.apiKey} store={draft} db={db} />
       <ChannelTable db={db} store={draft} />
     </div>
   )
@@ -386,7 +386,7 @@ function ApiKeyRow({ apiKey, onChange }) {
   )
 }
 
-function SearchRow({ apiKey, store }) {
+function SearchRow({ apiKey, store, db }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [busy, setBusy] = useState(false)
@@ -450,27 +450,43 @@ function SearchRow({ apiKey, store }) {
         </div>
       </div>
       {error && <div className="alert alert-warning mt-2 py-2">{error}</div>}
-      {results.map(ch => (
-        <div key={ch.channel_id} className="d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2">
-          <img src={ch.thumbnail} alt="" width="36" height="36" className="rounded-circle" />
-          <span className="fw-semibold text-truncate">{ch.channel_title}</span>
-          <TopicBadges ch={ch} />
-          <div className="ms-auto">
-            <StatsCell ch={ch} />
-          </div>
-          <button
-            type="button"
-            className="btn btn-danger btn-sm"
-            onClick={() => {
-              store.addCustomChannel({ ...ch, min_age: 1, max_age: 15 })
-              setQuery('')
-            }}
+      {results.map(ch => {
+        // custom or curated: re-adding either is a no-op (curated wins on merge)
+        const added =
+          store.settings.customChannels.some(c => c.channel_id === ch.channel_id) ||
+          (db?.channels ?? []).some(c => c.channel_id === ch.channel_id)
+        return (
+          <div
+            key={ch.channel_id}
+            className={`d-flex align-items-center gap-3 bg-body-tertiary rounded p-2 mt-2${added ? ' opacity-50' : ''}`}
           >
-            <i className="fa-sharp-duotone fa-regular fa-plus me-1" />
-            Add
-          </button>
-        </div>
-      ))}
+            <img src={ch.thumbnail} alt="" width="36" height="36" className="rounded-circle" />
+            <span className="fw-semibold text-truncate">{ch.channel_title}</span>
+            <TopicBadges ch={ch} />
+            <div className="ms-auto">
+              <StatsCell ch={ch} />
+            </div>
+            {added ? (
+              <span className="text-secondary text-nowrap small">
+                <i className="fa-sharp-duotone fa-regular fa-check me-1" />
+                Already added
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  store.addCustomChannel({ ...ch, min_age: 1, max_age: 15 })
+                  setQuery('')
+                }}
+              >
+                <i className="fa-sharp-duotone fa-regular fa-plus me-1" />
+                Add
+              </button>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
