@@ -12,14 +12,17 @@ import { enroll, makeChallenge } from './lib.js'
  * single big button rather than auto-firing on load.
  */
 export function EnrollGate({ onEnrolled }) {
-  const [error, setError] = useState(null)
+  const [failed, setFailed] = useState(false)
 
   const start = async () => {
-    setError(null)
+    setFailed(false)
     try {
       onEnrolled(await enroll())
     } catch (e) {
-      setError(e.message)
+      // a cancelled/timed-out prompt is routine; the browser's NotAllowedError
+      // message (with its W3C spec link) would only confuse a parent
+      console.error('biometric enrollment failed', e)
+      setFailed(true)
     }
   }
 
@@ -33,7 +36,7 @@ export function EnrollGate({ onEnrolled }) {
         <i className="fa-sharp-duotone fa-regular fa-fingerprint me-2" />
         Enter
       </button>
-      {error && <div className="alert alert-warning py-2">{error} — try again</div>}
+      {failed && <div className="alert alert-warning py-2">That didn't go through — tap Enter to try again</div>}
     </div>
   )
 }
