@@ -62,6 +62,7 @@ export default function Settings({ db, store, watchStore, onDone }) {
 
       <AgeRow value={settings.ageRange} onChange={draft.setAgeRange} />
       <QuotaRow value={settings.quotaMins} onChange={draft.setQuotaMins} watchStore={watchStore} />
+      <MinLengthRow value={settings.minVideoMins} onChange={draft.setMinVideoMins} />
       <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
       <SearchRow apiKey={settings.apiKey} store={draft} />
       <ChannelTable db={db} store={draft} />
@@ -216,6 +217,44 @@ function QuotaRow({ value, onChange, watchStore }) {
           </tr>
         </tbody>
       </table>
+    </div>
+  )
+}
+
+const MIN_LENGTH_MAX_MINS = 60 // 1h, in 5-min steps
+
+/** Same 44px-thumb track as QuotaSlider, but no usage fill — the thumb label
+ * is the minimum video length; 0 means show everything. */
+function MinLengthSlider({ value, onChange }) {
+  const pos = v => `calc(${v / MIN_LENGTH_MAX_MINS} * (100% - 44px) + 22px)`
+  return (
+    <div className="dual-slider quota-slider flex-grow-1">
+      <input
+        type="range"
+        min="0"
+        max={MIN_LENGTH_MAX_MINS}
+        step="5"
+        value={value}
+        aria-label="Minimum video length"
+        onChange={e => onChange(+e.target.value)}
+      />
+      {/* ">" marks it as a floor; at 0 nothing is filtered, so "all" */}
+      <span className="thumb-label" style={{ left: pos(value) }}>{value ? `>${fmtMins(value)}` : 'all'}</span>
+    </div>
+  )
+}
+
+function MinLengthRow({ value, onChange }) {
+  return (
+    <div className="d-flex align-items-center gap-3 mb-4">
+      <span
+        className="text-secondary text-nowrap"
+        title="Hide videos shorter than this — keeps quick-hit clips out of the gallery (0m shows everything)"
+      >
+        <i className="fa-duotone fa-solid fa-video-arrow-up-right me-2" />
+        Video Length
+      </span>
+      <MinLengthSlider value={value} onChange={onChange} />
     </div>
   )
 }

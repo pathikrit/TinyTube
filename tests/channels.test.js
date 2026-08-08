@@ -75,6 +75,27 @@ describe('mergeChannels', () => {
     expect(merged.find(c => c.channel_id === 'UCy')).toBeUndefined()
   })
 
+  it('drops videos shorter than minVideoMins, counting unknown durations as too short', () => {
+    const withDurations = {
+      channels: [
+        {
+          channel_id: 'UCa',
+          channel_title: 'Mixed',
+          min_age: 1,
+          max_age: 15,
+          videos: [{ id: 'short', duration: 299 }, { id: 'long', duration: 300 }, { id: 'unknown' }],
+        },
+      ],
+    }
+    const merged = mergeChannels(withDurations, {}, settings({ minVideoMins: 5 }))
+    expect(merged[0].videos.map(v => v.id)).toEqual(['long'])
+  })
+
+  it('minVideoMins of 0 keeps videos with unknown durations', () => {
+    const merged = mergeChannels(db, {}, settings())
+    expect(merged.map(c => c.videos.length)).toEqual([1, 1, 1])
+  })
+
   it('curated wins when a parent adds an already-curated channel', () => {
     const custom = [{ channel_id: 'UCa', channel_title: 'Dup', min_age: 1, max_age: 15 }]
     const merged = mergeChannels(db, {}, settings({ customChannels: custom }))

@@ -122,7 +122,7 @@ export function curatedChannels(db, overrides = {}) {
  * already-curated channel.
  */
 export function mergeChannels(db, customVideosById, settings) {
-  const { ageRange, customChannels, overrides } = settings
+  const { ageRange, customChannels, overrides, minVideoMins = 0 } = settings
   const curated = curatedChannels(db, overrides).filter(
     ch => !ch.hidden && !ch.disabled && overlaps(ageRange, ch.min_age, ch.max_age),
   )
@@ -130,7 +130,11 @@ export function mergeChannels(db, customVideosById, settings) {
   const custom = customChannels
     .filter(ch => !curatedIds.has(ch.channel_id) && !ch.disabled && overlaps(ageRange, ch.min_age, ch.max_age))
     .map(ch => ({ ...ch, videos: customVideosById[ch.channel_id] ?? [] }))
-  return [...curated, ...custom]
+  // unknown durations count as too short: don't let un-probed videos slip past
+  return [...curated, ...custom].map(ch => ({
+    ...ch,
+    videos: (ch.videos ?? []).filter(v => (v.duration ?? 0) >= minVideoMins * 60),
+  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -142,6 +146,7 @@ export const DEFAULTS = {
   apiKey: '',
   ageRange: [1, 15], // everything
   quotaMins: 180, // watch quota per rolling 12h window; 0 = no watching (there is no "off")
+  minVideoMins: 0, // hide videos shorter than this; 0 = show everything
   customChannels: [], // parent-added, same flat shape as channels.json entries: [{channel_id, channel_title, thumbnail, min_age, max_age}]
   overrides: {}, // per curated channel_id: {min_age?, max_age?, hidden?, disabled?} edited in the table
   passkeyId: null, // WebAuthn credential id (base64url); when set, the parent gate is biometric-only
@@ -170,6 +175,7 @@ export function storeApi(settings, update) {
     setApiKey: apiKey => update({ apiKey: apiKey.trim() }),
     setAgeRange: ([lo, hi]) => update({ ageRange: [Math.min(lo, hi), Math.max(lo, hi)] }),
     setQuotaMins: quotaMins => update({ quotaMins }),
+    setMinVideoMins: minVideoMins => update({ minVideoMins }),
     addCustomChannel: ch =>
       update({
         customChannels: [...settings.customChannels.filter(c => c.channel_id !== ch.channel_id), ch],
