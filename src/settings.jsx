@@ -220,20 +220,40 @@ function QuotaRow({ value, onChange, watchStore }) {
   )
 }
 
+// enough of a stored key to recognize it without exposing the whole thing
+const maskKey = k => `${k.slice(0, 6)}…${k.slice(-4)}`
+
 function ApiKeyRow({ apiKey, onChange }) {
   const [confirming, setConfirming] = useState(false)
+  const [focused, setFocused] = useState(false)
   const [check, setCheck] = useState(null) // null | 'busy' | 'ok' | error message
+  // masked preview only when idle; while editing the password dots take over.
+  // short strings are left unmasked — slices would overlap and it's not a key
+  const masked = !focused && apiKey.length > 12
 
-  const validate = async () => {
-    if (!apiKey) return
-    setCheck('busy')
-    try {
-      await validateApiKey(apiKey)
-      setCheck('ok')
-    } catch (err) {
-      setCheck(err.message)
+  // validate as soon as a key lands in the field (keys are usually pasted, so
+  // the 500ms debounce mostly guards slow typists; i18nLanguages = 1 quota
+  // unit per check). Also re-verifies a saved key on every Settings visit.
+  useEffect(() => {
+    if (!apiKey) {
+      setCheck(null)
+      return
     }
-  }
+    let stale = false
+    const timer = setTimeout(async () => {
+      setCheck('busy')
+      try {
+        await validateApiKey(apiKey)
+        if (!stale) setCheck('ok')
+      } catch (err) {
+        if (!stale) setCheck(`This API key did not work: ${err.message}`)
+      }
+    }, 500)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [apiKey])
 
   return (
     <div className="mb-4">
@@ -265,16 +285,26 @@ function ApiKeyRow({ apiKey, onChange }) {
                 setCheck(null)
                 onChange(e.target.value)
               }}
-              // Enter validates the key in place; preventDefault stops the
-              // implicit form submission from clicking the Save button
+              // validation is automatic; preventDefault stops the implicit
+              // form submission from clicking the Save button
               onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  validate()
-                }
+                if (e.key === 'Enter') e.preventDefault()
               }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              // dots hidden under the masked preview; still a password input
+              // so the browser's save-key prompt keeps working
+              style={masked ? { color: 'transparent' } : undefined}
               autoComplete="current-password"
             />
+            {masked && (
+              <span
+                className="position-absolute top-50 translate-middle-y pe-none font-monospace"
+                style={{ left: '0.75rem' }}
+              >
+                {maskKey(apiKey)}
+              </span>
+            )}
             {check === 'busy' && (
               <span
                 className="spinner-border spinner-border-sm position-absolute top-50 end-0 translate-middle-y me-2"
