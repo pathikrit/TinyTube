@@ -250,6 +250,9 @@ tr.out-of-range img {
   position: absolute;
   inset: 0;
   z-index: 30;
+  /* opaque black under the thumbnail: even if the image fails to load,
+     YouTube's paused tray / end screen must stay covered */
+  background-color: #000;
   background-size: cover;
   background-position: center;
 }
@@ -257,8 +260,7 @@ tr.out-of-range img {
 .paused-overlay-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.82);
-  backdrop-filter: blur(14px);
+  background: rgba(0, 0, 0, 0.4);
   color: #fff;
 }
 
