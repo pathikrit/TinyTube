@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useReactTable, getCoreRowModel, flexRender } from '@tanstack/react-table'
-import { curatedChannels, overlaps, storeApi, fmtMins, usageStats, windowUsed, QUOTA_WINDOW_MS } from './lib.js'
+import { curatedChannels, overlaps, storeApi } from './lib.js'
 import { searchChannels, resolveChannel, evictChannelCache, formatCount, validateApiKey } from './youtubeApi.js'
 
 const API_CONSOLE_URL = 'https://console.cloud.google.com/apis/library/youtube.googleapis.com'
 const looksLikeLink = s => /^@|^UC[0-9A-Za-z_-]{22}$|youtube\.com/.test(s.trim())
 const channelUrl = ch => ch.source_url ?? `https://www.youtube.com/channel/${ch.channel_id}`
 
-export default function Settings({ db, store, watchStore, onDone }) {
+export default function Settings({ db, store, onDone }) {
   // edits accumulate in an in-memory draft; localStorage is only touched by
   // Save, which appears once the draft diverges (back/edge-swipe discards)
   const [settings, setSettings] = useState(store.settings)
@@ -61,8 +61,6 @@ export default function Settings({ db, store, watchStore, onDone }) {
       </div>
 
       <AgeRow value={settings.ageRange} onChange={draft.setAgeRange} />
-      <QuotaRow value={settings.quotaMins} onChange={draft.setQuotaMins} watchStore={watchStore} />
-      <MinLengthRow value={settings.minVideoMins} onChange={draft.setMinVideoMins} />
       <ApiKeyRow apiKey={settings.apiKey} onChange={draft.setApiKey} />
       <SearchRow apiKey={settings.apiKey} store={draft} db={db} />
       <ChannelTable db={db} store={draft} />
@@ -151,110 +149,6 @@ function AgeRow({ value, onChange }) {
         Age
       </span>
       <DualAgeSlider value={value} onChange={onChange} />
-    </div>
-  )
-}
-
-const QUOTA_MAX_MINS = 240 // 4h, in 15-min steps
-const fmtClock = mins => (mins ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}` : '0')
-
-/** Single-thumb sibling of DualAgeSlider on the same track CSS; the fill span
- * shows time already used on the shared 0-4h scale. The thumb is 44px (not the
- * age slider's 32px) so the h:mm label inside it stays readable. */
-function QuotaSlider({ value, usedMins, onChange }) {
-  const pos = v => `calc(${v / QUOTA_MAX_MINS} * (100% - 44px) + 22px)`
-  return (
-    <div className="dual-slider quota-slider flex-grow-1">
-      {usedMins > 0 && <span className="track-fill" style={{ width: pos(Math.min(usedMins, QUOTA_MAX_MINS)) }} />}
-      <input
-        type="range"
-        min="0"
-        max={QUOTA_MAX_MINS}
-        step="15"
-        value={value}
-        aria-label="Watch quota"
-        onChange={e => onChange(+e.target.value)}
-      />
-      <span className="thumb-label" style={{ left: pos(value) }}>{fmtClock(value)}</span>
-    </div>
-  )
-}
-
-// no reset button: dragging the quota above what's used grants time, and the
-// 12h window expiry clears usage on its own
-function QuotaRow({ value, onChange, watchStore }) {
-  const stats = usageStats(watchStore.usage)
-  const cols = [
-    ['Session', stats.session, `Watched in the current ${QUOTA_WINDOW_MS / 3600_000}h quota window`],
-    ['24Hr', stats.last24h, 'Watched in the last 24 hours'],
-    ['WTD', stats.wtd, 'Week to date (since Sunday)'],
-    ['MTD', stats.mtd, 'Month to date'],
-    ['YTD', stats.ytd, 'Year to date'],
-  ]
-  return (
-    // flex-wrap + the slider's min-width: stats sit inline on wide screens
-    // and wrap below the slider on phones instead of crushing it
-    <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
-      <span
-        className="text-secondary text-nowrap"
-        title={`Set the viewing limit (resets every ${QUOTA_WINDOW_MS / 3600_000} hrs)`}
-      >
-        <i className="fa-sharp-duotone fa-regular fa-stopwatch me-2" />
-        Quota
-      </span>
-      <QuotaSlider value={value} usedMins={windowUsed(watchStore.usage) / 60} onChange={onChange} />
-      <table className="table table-dark table-borderless table-sm w-auto small text-nowrap m-0">
-        <tbody>
-          <tr className="text-secondary">
-            {cols.map(([label, , hover]) => (
-              <td key={label} className="py-0 px-2 text-center" title={hover}>{label}</td>
-            ))}
-          </tr>
-          <tr>
-            {cols.map(([label, secs, hover]) => (
-              <td key={label} className="py-0 px-2 text-center" title={hover}>{fmtMins(Math.round(secs / 60))}</td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-const MIN_LENGTH_MAX_MINS = 60 // 1h, in 5-min steps
-
-/** Same 44px-thumb track as QuotaSlider, but no usage fill — the thumb label
- * is the minimum video length; 0 means show everything. */
-function MinLengthSlider({ value, onChange }) {
-  const pos = v => `calc(${v / MIN_LENGTH_MAX_MINS} * (100% - 44px) + 22px)`
-  return (
-    <div className="dual-slider quota-slider flex-grow-1">
-      <input
-        type="range"
-        min="0"
-        max={MIN_LENGTH_MAX_MINS}
-        step="5"
-        value={value}
-        aria-label="Minimum video length"
-        onChange={e => onChange(+e.target.value)}
-      />
-      {/* ">" marks it as a floor; at 0 nothing is filtered, so "all" */}
-      <span className="thumb-label" style={{ left: pos(value) }}>{value ? `>${fmtMins(value)}` : 'all'}</span>
-    </div>
-  )
-}
-
-function MinLengthRow({ value, onChange }) {
-  return (
-    <div className="d-flex align-items-center gap-3 mb-4">
-      <span
-        className="text-secondary text-nowrap"
-        title="Hide videos shorter than this — keeps quick-hit clips out of the gallery (0m shows everything)"
-      >
-        <i className="fa-duotone fa-solid fa-video-arrow-up-right me-2" />
-        Video Length
-      </span>
-      <MinLengthSlider value={value} onChange={onChange} />
     </div>
   )
 }

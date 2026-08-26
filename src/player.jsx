@@ -3,13 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import YouTube from 'react-youtube'
-import { fmtMins, windowUsed } from './lib.js'
 
-export default function PlayerView({ video, watchStore, quotaMins, onExit, onQuotaExhausted }) {
-  const quotaSecs = quotaMins * 60
-  const secsLeft = Math.max(0, quotaSecs - windowUsed(watchStore.usage))
-  const pctLeft = quotaSecs ? (secsLeft / quotaSecs) * 100 : 0
-
+export default function PlayerView({ video, watchStore, onExit }) {
   // best-effort landscape: fullscreen + orientation lock works on Android;
   // iOS has neither, so CSS rotates the whole view in portrait (see styles)
   useEffect(() => {
@@ -37,27 +32,12 @@ export default function PlayerView({ video, watchStore, quotaMins, onExit, onQuo
           <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
           TinyTube
         </span>
-        <span className="ms-auto d-flex align-items-center gap-2 text-white-50">
-          {/* not fa-utility-duo fa-semibold: the token CSS ships no utility
-              fonts or 600 weight, so the duo layers render as two glyphs */}
-          <i className="fa-sharp-duotone fa-regular fa-stopwatch" />
-          {/* drains as quota is spent; recolors so it reads without the number */}
-          <div className="progress" style={{ width: 100, height: 8 }} title="Watch time left">
-            <div
-              className={`progress-bar ${pctLeft > 50 ? 'bg-success' : pctLeft > 20 ? 'bg-warning' : 'bg-danger'}`}
-              style={{ width: `${pctLeft}%` }}
-            />
-          </div>
-          {fmtMins(Math.ceil(secsLeft / 60))}
-        </span>
       </nav>
       <div className="player-stage position-relative flex-grow-1">
         <VideoPlayer
           video={video}
           watchStore={watchStore}
-          quotaMins={quotaMins}
           onExit={onExit}
-          onQuotaExhausted={onQuotaExhausted}
         />
       </div>
     </div>
@@ -86,7 +66,7 @@ const { ENDED, PLAYING, BUFFERING } = { ENDED: 0, PLAYING: 1, BUFFERING: 3 }
 const RESUME_MIN = 10 // don't bother resuming the first seconds
 const RESUME_TAIL = 20 // ...or into the credits
 
-export function VideoPlayer({ video, watchStore, quotaMins, onExit, onQuotaExhausted }) {
+export function VideoPlayer({ video, watchStore, onExit }) {
   const playerRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState(null)
@@ -94,53 +74,32 @@ export function VideoPlayer({ video, watchStore, quotaMins, onExit, onQuotaExhau
   const [progress, setProgress] = useState({ pos: 0, dur: video.duration ?? 0 })
   const [showControls, setShowControls] = useState(true)
   const hideTimer = useRef(null)
-  const pending = useRef(0) // watched seconds not yet flushed to the quota store
-  const lastTick = useRef(null) // { at: epoch ms, pos: playback secs } at the previous poll
+  const lastSavedPos = useRef(0)
 
   const playing = playerState === PLAYING
   // don't flash the opaque overlay while buffering into playback
   const active = playing || playerState === BUFFERING
 
   const save = useCallback(() => {
-    if (pending.current) {
-      watchStore.addWatchTime(pending.current)
-      pending.current = 0
-    }
     const p = playerRef.current
     if (!p) return
     const pos = Math.floor(p.getCurrentTime() ?? 0)
     const dur = Math.floor(p.getDuration() ?? 0)
-    if (pos > 0 && dur > 0) watchStore.saveProgress(video.id, pos, dur)
+    if (pos > 0 && dur > 0) {
+      watchStore.saveProgress(video.id, pos, dur)
+      lastSavedPos.current = pos
+    }
   }, [video.id, watchStore])
 
-  // poll every second; watch time = playback-position delta, NOT ticks gated
-  // on the PLAYING event: iOS standalone throttles/suspends timers and drops
-  // iframe state events, either of which froze the quota while the video
-  // kept playing. Position only advances by actually watching (there is no
-  // scrubber), a paused video contributes 0, and a late tick back-fills the
-  // whole gap. Capped at wall-clock elapsed so a stale player object can
-  // never over-charge. Persist every 5 watched seconds and on pause/hide/unmount.
+  // Poll progress for our controls; persist every 5 playback seconds and at
+  // the usual pause/hide/unmount save points.
   useEffect(() => {
     const interval = setInterval(() => {
       const p = playerRef.current
       if (!p) return
-      const now = Date.now()
       const pos = p.getCurrentTime() ?? 0
       setProgress({ pos, dur: p.getDuration() ?? 0 })
-      const prev = lastTick.current
-      lastTick.current = { at: now, pos }
-      if (!prev) return
-      const watched = Math.min(pos - prev.pos, (now - prev.at) / 1000)
-      if (watched <= 0) return
-      pending.current += watched
-      // hard stop the moment the quota runs out — otherwise a video started
-      // with 1 min left plays to the end for free
-      if (windowUsed(watchStore.usage) + pending.current >= quotaMins * 60) {
-        save()
-        onQuotaExhausted()
-      } else if (pending.current >= 5) {
-        save()
-      }
+      if (pos - lastSavedPos.current >= 5) save()
     }, 1000)
     const onHide = () => save()
     document.addEventListener('visibilitychange', onHide)
@@ -151,7 +110,7 @@ export function VideoPlayer({ video, watchStore, quotaMins, onExit, onQuotaExhau
       window.removeEventListener('pagehide', onHide)
       save()
     }
-  }, [save, watchStore, quotaMins, onQuotaExhausted])
+  }, [save])
 
   const pokeControls = useCallback(() => {
     setShowControls(true)
@@ -166,6 +125,7 @@ export function VideoPlayer({ video, watchStore, quotaMins, onExit, onQuotaExhau
     if (entry && !entry.completed && entry.pos > RESUME_MIN && entry.pos < entry.dur - RESUME_TAIL) {
       e.target.seekTo(entry.pos, true)
     }
+    lastSavedPos.current = e.target.getCurrentTime() ?? 0
     e.target.playVideo()
     pokeControls()
   }

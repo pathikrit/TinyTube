@@ -147,38 +147,6 @@ html, body, #root {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); /* extra contrast on the red thumb */
 }
 
-/* watch-quota slider: time already used, drawn under the thumb on the same 0-4h track */
-.dual-slider .track-fill {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  height: 6px;
-  transform: translateY(-50%);
-  border-radius: 3px;
-  background: rgba(230, 33, 23, 0.55);
-}
-
-/* the h:mm value needs a bigger thumb than the age slider's 32px to stay
-   readable; min-width makes the inline stats table wrap below on phones */
-.quota-slider {
-  min-width: 260px;
-  height: 3rem;
-}
-
-.quota-slider input[type='range']::-webkit-slider-thumb {
-  width: 44px;
-  height: 44px;
-}
-
-.quota-slider input[type='range']::-moz-range-thumb {
-  width: 44px;
-  height: 44px;
-}
-
-.quota-slider .thumb-label {
-  font-size: 0.8rem;
-}
-
 /* channel rows the kid won't see (outside the age filter, or checkbox off):
    still editable, visibly inactive — but the enable checkbox in the first
    cell keeps full strength so the way back stays obvious */
