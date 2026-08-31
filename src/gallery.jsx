@@ -3,7 +3,15 @@
 import { useMemo } from 'react'
 import { gallerySort, fraction, WATCHED_THRESHOLD } from './lib.js'
 
-export default function Gallery({ channels, watchStore, onPlay, onParents }) {
+export default function Gallery({
+  channels,
+  watchStore,
+  onPlay,
+  onParents,
+  fullscreenSupported,
+  fullscreenActive,
+  onToggleFullscreen,
+}) {
   const videos = useMemo(
     () => gallerySort(channels, watchStore.watched),
     [channels, watchStore.watched],
@@ -18,6 +26,16 @@ export default function Gallery({ channels, watchStore, onPlay, onParents }) {
           <i className="fa-duotone fa-regular fa-tv-retro me-2 text-danger" />
           TinyTube
         </span>
+        {fullscreenSupported && (
+          <button
+            type="button"
+            className="btn btn-lg"
+            aria-label={fullscreenActive ? 'Exit fullscreen' : 'Enter fullscreen'}
+            onClick={onToggleFullscreen}
+          >
+            <i className={`fa-sharp-duotone fa-regular ${fullscreenActive ? 'fa-compress' : 'fa-expand'} text-danger`} />
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-lg"

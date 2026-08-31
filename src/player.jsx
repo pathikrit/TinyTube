@@ -5,20 +5,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import YouTube from 'react-youtube'
 
 export default function PlayerView({ video, watchStore, onExit }) {
-  // best-effort landscape: fullscreen + orientation lock works on Android;
-  // iOS has neither, so CSS rotates the whole view in portrait (see styles)
+  // Fullscreen is requested by the video-card tap in App because the API
+  // requires a user gesture. Lock after that request settles; iOS/iPadOS
+  // browsers without orientation locking use the portrait CSS fallback.
   useEffect(() => {
-    ;(async () => {
+    const syncOrientation = () => {
       try {
-        await document.documentElement.requestFullscreen?.()
-        await screen.orientation?.lock?.('landscape')
+        if (document.fullscreenElement) {
+          screen.orientation?.lock?.('landscape')?.catch?.(() => {})
+        } else {
+          screen.orientation?.unlock?.()
+        }
       } catch {
-        /* unsupported (iOS Safari) — the portrait CSS rotation covers it */
+        /* unsupported — the portrait CSS rotation covers it */
       }
-    })()
+    }
+    syncOrientation()
+    document.addEventListener('fullscreenchange', syncOrientation)
     return () => {
+      document.removeEventListener('fullscreenchange', syncOrientation)
       screen.orientation?.unlock?.()
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
     }
   }, [])
 

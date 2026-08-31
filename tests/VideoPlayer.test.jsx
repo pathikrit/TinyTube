@@ -38,6 +38,11 @@ beforeEach(() => {
   onExit = vi.fn()
 })
 
+afterEach(() => {
+  delete document.fullscreenElement
+  vi.unstubAllGlobals()
+})
+
 const renderPlayer = (Component = VideoPlayer) =>
   render(
     <Component
@@ -68,6 +73,23 @@ it('can escape back to the gallery via the top bar while loading', () => {
   renderPlayer(PlayerView)
   fireEvent.click(screen.getByLabelText('Back'))
   expect(onExit).toHaveBeenCalled()
+})
+
+it('locks landscape when fullscreen settles and unlocks on cleanup', () => {
+  let fullscreenElement = null
+  const lock = vi.fn(() => Promise.resolve())
+  const unlock = vi.fn()
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => fullscreenElement })
+  vi.stubGlobal('screen', { orientation: { lock, unlock } })
+
+  const view = renderPlayer(PlayerView)
+  expect(lock).not.toHaveBeenCalled()
+  fullscreenElement = document.documentElement
+  fireEvent(document, new Event('fullscreenchange'))
+  expect(lock).toHaveBeenCalledWith('landscape')
+
+  view.unmount()
+  expect(unlock).toHaveBeenCalled()
 })
 
 describe('once the player is ready', () => {

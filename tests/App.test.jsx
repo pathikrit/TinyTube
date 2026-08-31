@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import App from '../src/main.jsx'
 import { verify } from '../src/lib.js'
 
@@ -40,10 +40,38 @@ function fakeStorage() {
   }
 }
 
+function mockFullscreen({ reject = false } = {}) {
+  let element = null
+  Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element })
+
+  const request = vi.fn(() => {
+    if (reject) return Promise.reject(new Error('denied'))
+    element = document.documentElement
+    document.dispatchEvent(new Event('fullscreenchange'))
+    return Promise.resolve()
+  })
+  const exit = vi.fn(() => {
+    element = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+    return Promise.resolve()
+  })
+  Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: request })
+  Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit })
+  return { request, exit }
+}
+
 beforeEach(() => {
   vi.stubGlobal('localStorage', fakeStorage())
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => db })))
   verify.mockClear()
+})
+
+afterEach(() => {
+  delete document.fullscreenEnabled
+  delete document.fullscreenElement
+  delete document.exitFullscreen
+  delete document.documentElement.requestFullscreen
 })
 
 describe('first-run enrollment', () => {
@@ -99,5 +127,60 @@ describe('player routing', () => {
     render(<App />)
     fireEvent.click(await screen.findByText('Vid'))
     expect(await screen.findByTestId('yt-stub')).toBeTruthy()
+  })
+
+  it('enters fullscreen for a video and exits it when the player closes', async () => {
+    const fullscreen = mockFullscreen()
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(fullscreen.request).toHaveBeenCalledTimes(1)
+    fireEvent.click(await screen.findByLabelText('Back'))
+    await waitFor(() => expect(fullscreen.exit).toHaveBeenCalledTimes(1))
+  })
+
+  it('exits video-owned fullscreen on browser Back or an iOS edge-swipe', async () => {
+    const fullscreen = mockFullscreen()
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    fireEvent(window, new PopStateEvent('popstate'))
+    await waitFor(() => expect(fullscreen.exit).toHaveBeenCalledTimes(1))
+    expect(await screen.findByLabelText('Parents')).toBeTruthy()
+  })
+
+  it('preserves fullscreen that was entered manually before a video', async () => {
+    const fullscreen = mockFullscreen()
+    render(<App />)
+    fireEvent.click(await screen.findByLabelText('Enter fullscreen'))
+    expect(await screen.findByLabelText('Exit fullscreen')).toBeTruthy()
+    fireEvent.click(screen.getByText('Vid'))
+    fireEvent.click(await screen.findByLabelText('Back'))
+    expect(fullscreen.request).toHaveBeenCalledTimes(1)
+    expect(fullscreen.exit).not.toHaveBeenCalled()
+  })
+
+  it('keeps playing if a fullscreen request is rejected', async () => {
+    const fullscreen = mockFullscreen({ reject: true })
+    render(<App />)
+    fireEvent.click(await screen.findByText('Vid'))
+    expect(fullscreen.request).toHaveBeenCalledTimes(1)
+    expect(await screen.findByTestId('yt-stub')).toBeTruthy()
+  })
+})
+
+describe('fullscreen toolbar', () => {
+  it('toggles fullscreen and follows browser-driven state changes', async () => {
+    const fullscreen = mockFullscreen()
+    render(<App />)
+    fireEvent.click(await screen.findByLabelText('Enter fullscreen'))
+    expect(fullscreen.request).toHaveBeenCalledTimes(1)
+    fireEvent.click(await screen.findByLabelText('Exit fullscreen'))
+    expect(fullscreen.exit).toHaveBeenCalledTimes(1)
+    expect(await screen.findByLabelText('Enter fullscreen')).toBeTruthy()
+  })
+
+  it('hides the control when the API is unavailable', async () => {
+    render(<App />)
+    await screen.findByLabelText('Parents')
+    expect(screen.queryByLabelText('Enter fullscreen')).toBeNull()
   })
 })
