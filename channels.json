@@ -1,4 +1,5 @@
 [
+  { "channel": "SesameStreet", "min_age": 2, "max_age": 6 },
   { "channel": "msrachel", "min_age": 2, "max_age": 3 },
   { "channel": "Blippi", "min_age": 2, "max_age": 3 },
   { "channel": "Numberblocks", "min_age": 3, "max_age": 4 },
@@ -9,6 +10,20 @@
   { "channel": "MysterySci", "min_age": 4, "max_age": 5 },
   { "channel": "peekaboo_kidz", "min_age": 4, "max_age": 5 },
   { "channel": "JackHartmann", "min_age": 4, "max_age": 5 },
+  { "channel": "NatGeoKids", "min_age": 4, "max_age": 10 },
   { "channel": "NumberjacksTV", "min_age": 5, "max_age": 6 },
-  { "channel": "HomeschoolPop", "min_age": 5, "max_age": 6 }
+  { "channel": "HomeschoolPop", "min_age": 5, "max_age": 6 },
+  { "channel": "ScienceMax", "min_age": 5, "max_age": 12 },
+  { "channel": "crashcoursekids", "min_age": 6, "max_age": 12 },
+  { "channel": "MarkRober", "min_age": 6, "max_age": 15 },
+  { "channel": "MinuteEarth", "min_age": 7, "max_age": 15 },
+  { "channel": "CleoAbram", "min_age": 8, "max_age": 15 },
+  { "channel": "veritasium", "min_age": 8, "max_age": 15 },
+  { "channel": "TEDEd", "min_age": 8, "max_age": 15 },
+  { "channel": "minutephysics", "min_age": 8, "max_age": 15 },
+  { "channel": "numberphile", "min_age": 8, "max_age": 15 },
+  { "channel": "smartereveryday", "min_age": 8, "max_age": 15 },
+  { "channel": "PracticalEngineeringChannel", "min_age": 9, "max_age": 15 },
+  { "channel": "kurzgesagt", "min_age": 9, "max_age": 15 },
+  { "channel": "pbsspacetime", "min_age": 10, "max_age": 15 }
 ]
